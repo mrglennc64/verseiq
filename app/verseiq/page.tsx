@@ -1,14 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { computePlaylistGaps } from "./gapAnalysis";
 import { type PlaylistMetadata } from "./territory";
 import { buildRoyaltyAudit } from "./audit";
+import { computePlaylistValueScore } from "./valueScore";
+
+type ArtistSearchResult = {
+  id: string;
+  name: string;
+  followers: number;
+  popularity: number;
+};
 
 export default function VerseIQPage() {
   const [token, setToken] = useState<string | null>(null);
+  const [artistQuery, setArtistQuery] = useState("");
   const [artistId, setArtistId] = useState("");
   const [artistName, setArtistName] = useState("");
+  const [artistMatches, setArtistMatches] = useState<ArtistSearchResult[]>([]);
+  const [isSearchingArtists, setIsSearchingArtists] = useState(false);
   const [artistSummary, setArtistSummary] = useState<any | null>(null);
   const [playlists, setPlaylists] = useState<PlaylistMetadata[]>([]);
   const [referencePlaylists, setReferencePlaylists] = useState<PlaylistMetadata[]>([]);
@@ -146,6 +157,47 @@ export default function VerseIQPage() {
       .join(" | ");
   }
 
+  async function searchArtists() {
+    if (!token) {
+      setErrorMessage("Connect Spotify first before searching artists.");
+      return;
+    }
+
+    const query = artistQuery.trim();
+    if (query.length < 2) {
+      setErrorMessage("Type at least 2 characters to search artists.");
+      return;
+    }
+
+    setErrorMessage(null);
+    setIsSearchingArtists(true);
+    try {
+      const res = await fetch(
+        `/api/spotify/artists?q=${encodeURIComponent(query)}&token=${encodeURIComponent(token)}`
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.details || data?.error || `Artist search failed (HTTP ${res.status})`);
+      }
+
+      setArtistMatches(Array.isArray(data?.artists) ? data.artists : []);
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(
+        error instanceof Error ? `Artist search failed: ${error.message}` : "Artist search failed."
+      );
+    } finally {
+      setIsSearchingArtists(false);
+    }
+  }
+
+  function selectArtist(artist: ArtistSearchResult) {
+    setArtistId(artist.id);
+    setArtistName(artist.name);
+    setArtistQuery(artist.name);
+    setArtistMatches([]);
+  }
+
   async function fetchArtistAndPlaylists() {
     setErrorMessage(null);
 
@@ -201,6 +253,15 @@ export default function VerseIQPage() {
     }
   }
 
+  const scoredGaps = useMemo(() => {
+    return gaps
+      .map((playlist) => {
+        const value = computePlaylistValueScore(playlist, artistName);
+        return { playlist, value };
+      })
+      .sort((a, b) => b.value.score - a.value.score);
+  }, [gaps, artistName]);
+
   if (isRefreshingToken) {
     return (
       <div style={{ padding: 40 }}>
@@ -248,6 +309,33 @@ export default function VerseIQPage() {
       <p>Basic metadata connection is live. This is your first gap analysis prototype.</p>
 
       <div style={{ marginTop: 20, marginBottom: 20 }}>
+        <label>
+          Artist Search: {" "}
+          <input
+            value={artistQuery}
+            onChange={(event) => setArtistQuery(event.target.value)}
+            style={{ width: 260 }}
+            placeholder="Search by artist name"
+          />
+        </label>
+        <button onClick={searchArtists} style={{ marginLeft: 8 }} disabled={isSearchingArtists}>
+          {isSearchingArtists ? "Searching..." : "Search"}
+        </button>
+        {artistMatches.length > 0 ? (
+          <ul style={{ marginTop: 8, marginBottom: 12, maxWidth: 720 }}>
+            {artistMatches.map((artist) => (
+              <li key={artist.id} style={{ marginBottom: 6 }}>
+                <button
+                  onClick={() => selectArtist(artist)}
+                  style={{ cursor: "pointer" }}
+                >
+                  {artist.name} · {artist.followers.toLocaleString()} followers · popularity {artist.popularity}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
         <label>
           Artist ID:{" "}
           <input
@@ -302,8 +390,9 @@ export default function VerseIQPage() {
 
       <h2>Gaps (Playlists you&apos;re not in)</h2>
       <ul>
-        {gaps.map((playlist) => (
+        {scoredGaps.map(({ playlist, value }) => (
           <li key={playlist.id}>
+            Value score {value.score}/100 · Territory {value.territory} · {" "}
             {playlist.name} · {playlist.followers.toLocaleString()} followers · {playlist.ownerName || "Unknown owner"} · {playlist.isEditorial ? "Editorial" : "User/Label"}
           </li>
         ))}
