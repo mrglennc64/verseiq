@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>VerseIQ · Terms of Use</title>
+  <meta name="description" content="VerseIQ Terms of Use — Spotify metadata analytics for artists, rights holders, and music professionals.">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #04070c;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif;
+      color: #edf2ff;
+      line-height: 1.55;
+    }
+
+    /* subtle depth background */
+    .bg-soft {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -2;
+      background: radial-gradient(circle at 20% 30%, #0a111c, #010101);
+    }
+    .bg-soft::after {
+      content: "";
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(ellipse at 80% 40%, rgba(29, 185, 84, 0.06) 0%, rgba(0,0,0,0) 70%);
+      pointer-events: none;
+    }
+
+    .terms-container {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 2rem 1.8rem 4rem 1.8rem;
+    }
+
+    /* card with glassmorphism, clean borders */
+    .terms-card {
+      background: rgba(10, 15, 24, 0.78);
+      backdrop-filter: blur(2px);
+      border-radius: 2rem;
+      border: 1px solid rgba(29, 185, 84, 0.2);
+      padding: 2rem 2.2rem 2.8rem 2.2rem;
+      box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.6);
+      transition: border-color 0.2s;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #FFFFFF 0%, #BCF0D0 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    .last-updated {
+      color: #8aa0d0;
+      font-size: 0.85rem;
+      border-bottom: 1px solid rgba(29, 185, 84, 0.2);
+      padding-bottom: 0.75rem;
+      margin-bottom: 1.6rem;
+      display: inline-block;
+    }
+
+    h2 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin: 1.8rem 0 0.7rem 0;
+      color: #e2f0e6;
+      border-left: 3px solid #1DB954;
+      padding-left: 0.85rem;
+    }
+
+    p {
+      color: #cad5f0;
+      margin-bottom: 1rem;
+      line-height: 1.6;
+    }
+
+    .highlight-badge {
+      background: rgba(29, 185, 84, 0.12);
+      border-radius: 100px;
+      padding: 0.2rem 1rem;
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: #6fcf97;
+      display: inline-block;
+      margin-bottom: 1rem;
+      border: 0.5px solid rgba(29, 185, 84, 0.3);
+    }
+
+    .info-note {
+      background: #0a101a;
+      border-radius: 1rem;
+      padding: 0.9rem 1.3rem;
+      margin: 1.2rem 0 1.2rem 0;
+      border-left: 2px solid #1DB954;
+      font-size: 0.9rem;
+      color: #b6caf5;
+    }
+
+    hr {
+      border: 0;
+      height: 1px;
+      background: rgba(29, 185, 84, 0.15);
+      margin: 2rem 0 1rem 0;
+    }
+
+    .footer-note {
+      margin-top: 2rem;
+      font-size: 0.75rem;
+      text-align: center;
+      color: #5e77a5;
+    }
+
+    .legal-links {
+      display: flex;
+      justify-content: center;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+      margin-top: 1.5rem;
+      font-size: 0.85rem;
+    }
+
+    a {
+      color: #6fcf97;
+      text-decoration: none;
+      border-bottom: 1px dotted rgba(111, 207, 151, 0.4);
+    }
+    a:hover {
+      color: #1DB954;
+    }
+
+    @media (max-width: 640px) {
+      .terms-container {
+        padding: 1rem 1.2rem 3rem 1.2rem;
+      }
+      .terms-card {
+        padding: 1.5rem;
+      }
+      h1 {
+        font-size: 1.8rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-soft"></div>
+<div class="terms-container">
+  <div class="terms-card">
+    <span class="highlight-badge">⚖️ Spotify Developer Terms · VerseIQ</span>
+    <h1>Terms of Use – VerseIQ</h1>
+    <div class="last-updated">Last updated: April 2026</div>
+
+    <h2>1. Acceptance</h2>
+    <p>By accessing or using VerseIQ (“the Service”), you agree to be bound by these Terms of Use. If you do not agree to all the terms, you may not use the Service. Continued use constitutes acceptance of any future updates to these terms.</p>
+
+    <h2>2. Description</h2>
+    <p>VerseIQ provides analytics based on public Spotify metadata to help artists, labels, and music professionals identify international opportunities, repertoire gaps, and market trends. The Service processes publicly accessible data from the Spotify Web API to generate structured insights and reports.</p>
+
+    <h2>3. Spotify API usage</h2>
+    <p>VerseIQ uses the Spotify Web API in strict accordance with Spotify’s Developer Terms, Brand Guidelines, and Platform Rules. Your use of VerseIQ may also be subject to Spotify’s own terms of service and developer policies. We do not circumvent any API restrictions, and we only request the minimal data scope necessary (public metadata only).</p>
+    <div class="info-note">
+      🔍 <strong>Data scope:</strong> artists, tracks, albums, playlists (public), genres, popularity metrics. No private user data or listening history is ever accessed.
+    </div>
+
+    <h2>4. Responsibilities & Acceptable Use</h2>
+    <p>You agree not to misuse Spotify data obtained via VerseIQ, nor to attempt to reverse engineer, scrape, or extract substantial portions of the Service for competitive purposes. You will not use VerseIQ to infringe on any third-party rights, violate any applicable laws, or interfere with Spotify’s API operations. Any unauthorized use may result in immediate termination of access.</p>
+
+    <h2>5. No Warranty</h2>
+    <p>VerseIQ is provided “as is” and “as available” without warranties of any kind, either express or implied, including but not limited to implied warranties of merchantability, fitness for a particular purpose, or non-infringement. We do not guarantee that the Service will be uninterrupted, error-free, or that insights derived are completely accurate. Metadata analysis is based on publicly available information; decisions made using VerseIQ remain your sole responsibility.</p>
+
+    <h2>6. Limitation of Liability</h2>
+    <p>To the maximum extent permitted by law, VerseIQ and its operators shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or any loss of profits or revenues, whether incurred directly or indirectly, or any loss of data, use, goodwill, or other intangible losses, resulting from your use or inability to use the Service.</p>
+
+    <h2>7. Modifications & Termination</h2>
+    <p>We reserve the right to modify, suspend, or discontinue any part of VerseIQ at any time, with or without notice. We may also update these Terms periodically; the latest version will always be available at this URL. Continued use after changes implies acceptance.</p>
+
+    <h2>8. Contact</h2>
+    <p>For any questions regarding these Terms, Spotify compliance, or data inquiries, please reach out:<br>
+    📧 <a href="mailto:legal@useverseiq.com">legal@useverseiq.com</a><br>
+    📧 <a href="mailto:hello@useverseiq.com">hello@useverseiq.com</a> (general inquiries)</p>
+
+    <hr>
+    <p style="font-size: 0.8rem; text-align: center; margin-top: 0.5rem;">
+      VerseIQ is an independent analytics tool not endorsed or certified by Spotify. All Spotify® trademarks belong to Spotify AB.
+    </p>
+    <div class="legal-links">
+      <a href="verseiq.html">Home</a>
+      <a href="vprivacy.html">Privacy Policy</a>
+    </div>
+  </div>
+  <div class="footer-note">
+    © VerseIQ — intelligence layer for music rights data · useverseiq.com
+  </div>
+</div>
+</body>
+</html>

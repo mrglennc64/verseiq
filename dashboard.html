@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>VerseIQ — Spotify Analytics for Artists</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(145deg, #0a0c12 0%, #10131c 100%);
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif;
+      color: #eef2ff;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* minimal, secure-looking container */
+    .verse-container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+
+    .card {
+      background: rgba(18, 22, 32, 0.8);
+      backdrop-filter: blur(2px);
+      border-radius: 2rem;
+      border: 1px solid rgba(29, 185, 84, 0.25);
+      box-shadow: 0 20px 35px -12px rgba(0,0,0,0.5);
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #FFFFFF 0%, #B3F0C5 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 500;
+      margin: 1.5rem 0 0.75rem 0;
+      color: #c9f0d4;
+      border-left: 3px solid #1DB954;
+      padding-left: 0.75rem;
+    }
+
+    p, li {
+      color: #cdd9ff;
+      margin-bottom: 0.75rem;
+    }
+
+    .spotify-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #1DB954;
+      color: white;
+      font-weight: 600;
+      padding: 0.85rem 2rem;
+      border-radius: 500px;
+      text-decoration: none;
+      font-size: 1rem;
+      transition: all 0.2s ease;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 6px 14px rgba(29,185,84,0.25);
+    }
+
+    .spotify-btn:hover {
+      background: #1aa34a;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px -5px rgba(29,185,84,0.4);
+    }
+
+    .badge-minimal {
+      background: rgba(29,185,84,0.12);
+      border-radius: 40px;
+      padding: 0.2rem 0.8rem;
+      font-size: 0.8rem;
+      display: inline-block;
+      color: #6fcf97;
+      border: 0.5px solid rgba(29,185,84,0.3);
+    }
+
+    ul, .insight-list {
+      margin: 1rem 0 1rem 1.5rem;
+    }
+
+    li {
+      margin: 0.5rem 0;
+    }
+
+    hr {
+      border: 0;
+      height: 1px;
+      background: rgba(29,185,84,0.2);
+      margin: 1.5rem 0;
+    }
+
+    footer {
+      margin-top: 2rem;
+      font-size: 0.75rem;
+      text-align: center;
+      color: #5b6e8c;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top: 2px solid #1DB954;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .code-block {
+      background: #0a0c12;
+      border-radius: 1rem;
+      padding: 0.75rem;
+      font-family: monospace;
+      font-size: 0.8rem;
+      border: 1px solid #2a2f3f;
+      overflow-x: auto;
+    }
+
+    @media (max-width: 550px) {
+      .verse-container { padding: 1rem; }
+      .card { padding: 1.5rem; }
+      h1 { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!--
+  ⭐⭐⭐ VERSEIQ — SPOTIFY COMPLIANT MINIMAL WEB APP ⭐⭐⭐
+  This single HTML file dynamically simulates all 7 required pages:
+  1. /callback (auth code catcher)
+  2. /api/spotify/callback (token exchange simulation, fully secure)
+  3. /privacy
+  4. /terms
+  5. /verseiq/connect
+  6. /verseiq/dashboard
+  7. Folder structure reference (visual)
+
+  All Spotify flows are implemented with realistic client-side + mock token exchange.
+  Uses localStorage to emulate secure session storage (for demo purpose).
+  In production, replace backend simulation with real Next.js API routes.
+-->
+
+<script>
+  // --------------------------------------------------------------
+  // MINIMAL ROUTER (hash-based navigation to simulate pages)
+  // Also respects /callback?code=... style queries
+  // --------------------------------------------------------------
+  function navigate(route, queryString = '') {
+    let path = route;
+    if (queryString) {
+      path = route + '?' + queryString;
+    }
+    window.location.hash = path;
+    renderPageFromHash();
+  }
+
+  function getCurrentRoute() {
+    let hash = window.location.hash.slice(1); // remove #
+    if (!hash) hash = '/verseiq/connect';
+    // separate path from query
+    const [path, query] = hash.split('?');
+    return { path: path || '/verseiq/connect', query: query || '' };
+  }
+
+  // Helper to parse query string
+  function getQueryParams(query) {
+    const params = new URLSearchParams(query);
+    return Object.fromEntries(params.entries());
+  }
+
+  // ---------- MOCK BACKEND / TOKEN EXCHANGE (secure simulation) ----------
+  // Simulates Spotify token exchange using "code" and returns token data.
+  // In real Next.js app, this would be your /api/spotify/callback route.
+  async function mockTokenExchange(code) {
+    // emulate network delay & validation
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (!code || code.length < 5) {
+          reject(new Error("Invalid authorization code"));
+          return;
+        }
+        // mock token response exactly as Spotify would return
+        const mockTokenData = {
+          access_token: "BQC" + Math.random().toString(36).substring(2) + "mock",
+          token_type: "Bearer",
+          expires_in: 3600,
+          refresh_token: "AQV" + Math.random().toString(36).substring(4),
+          scope: ""
+        };
+        // store token securely (simulated DB / encrypted session)
+        try {
+          localStorage.setItem("verseiq_spotify_token", JSON.stringify({
+            ...mockTokenData,
+            obtained_at: Date.now()
+          }));
+          console.log("✅ Spotify token stored (secure mock)", mockTokenData);
+        } catch(e) { console.warn(e); }
+        resolve(mockTokenData);
+      }, 600);
+    });
+  }
+
+  // clear token on logout or errors
+  function clearToken() {
+    localStorage.removeItem("verseiq_spotify_token");
+  }
+
+  function isAuthenticated() {
+    const tokenRaw = localStorage.getItem("verseiq_spotify_token");
+    if (!tokenRaw) return false;
+    try {
+      const token = JSON.parse(tokenRaw);
+      // simple expiry check (expires_in based)
+      if (token.obtained_at && token.expires_in) {
+        const expired = (Date.now() - token.obtained_at) > (token.expires_in * 1000);
+        if (expired) {
+          clearToken();
+          return false;
+        }
+      }
+      return !!token.access_token;
+    } catch(e) { return false; }
+  }
+
+  // ---------- PAGE RENDERER (all 7 required views) ----------
+  function renderPageFromHash() {
+    const { path, query } = getCurrentRoute();
+    const appRoot = document.getElementById("app-root");
+    if (!appRoot) return;
+
+    // 1. /callback page – receives code & forwards to backend (mock)
+    if (path === '/callback') {
+      const params = getQueryParams(query);
+      const code = params.code;
+      const error = params.error;
+      // immediately process the code (simulate useEffect)
+      if (error) {
+        renderCallbackError(error);
+        return;
+      }
+      if (code) {
+        // show loading + forward to mock backend token exchange
+        renderCallbackLoading();
+        // simulate fetch to /api/spotify/callback
+        mockTokenExchange(code)
+          .then(() => {
+            // after token stored, redirect to dashboard
+            window.location.hash = "/verseiq/dashboard";
+            renderPageFromHash();
+          })
+          .catch((err) => {
+            console.error("Token exchange failed:", err);
+            renderCallbackError(err.message || "Spotify auth failed");
+          });
+      } else {
+        renderCallbackError("Missing code parameter");
+      }
+      return;
+    }
+
+    // 2. /api/spotify/callback is a backend route — we won't render but we show a mock info
+    //    but for completeness: if someone lands on /api/spotify/callback, we show a minimal JSON-like message
+    if (path === '/api/spotify/callback') {
+      document.getElementById("app-root").innerHTML = `
+        <div class="verse-container">
+          <div class="card">
+            <h1>🔐 Token endpoint (simulated)</h1>
+            <p>This is the equivalent of <code>app/api/spotify/callback/route.ts</code>.<br>
+            In production, this API route exchanges the code for tokens using Basic Auth with Spotify.</p>
+            <div class="code-block">
+              POST https://accounts.spotify.com/api/token<br>
+              Authorization: Basic [clientId:clientSecret]<br>
+              grant_type=authorization_code&code=...
+            </div>
+            <p style="margin-top:1rem;">✅ Demo mode: token exchange is fully emulated.<br>
+            <a href="#" onclick="navigate('/verseiq/connect'); return false;" class="spotify-btn" style="background:#2c2f3f; margin-top:1rem;">← Back to connect</a></p>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    // 3. /privacy page
+    if (path === '/privacy') {
+      renderPrivacyPage();
+      return;
+    }
+
+    // 4. /terms page
+    if (path === '/terms') {
+      renderTermsPage();
+      return;
+    }
+
+    // 5. /verseiq/connect page
+    if (path === '/verseiq/connect') {
+      renderConnectPage();
+      return;
+    }
+
+    // 6. /verseiq/dashboard page
+    if (path === '/verseiq/dashboard') {
+      renderDashboardPage();
+      return;
+    }
+
+    // fallback: redirect to connect
+    window.location.hash = "/verseiq/connect";
+    renderConnectPage();
+  }
+
+  // ----- RENDER HELPERS (minimal & secure compliant) -----
+  function renderCallbackLoading() {
+    const root = document.getElementById("app-root");
+    root.innerHTML = `
+      <div class="verse-container">
+        <div class="card" style="text-align:center;">
+          <div style="display:flex; justify-content:center; margin-bottom:1.5rem;"><div class="loading-spinner"></div></div>
+          <h1>🔐 Connecting to Spotify…</h1>
+          <p>Exchanging authorization code for secure token. Please wait.</p>
+          <p style="font-size:0.8rem; opacity:0.7;">Your data stays private — only public metadata is accessed.</p>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderCallbackError(errorMsg) {
+    const root = document.getElementById("app-root");
+    root.innerHTML = `
+      <div class="verse-container">
+        <div class="card">
+          <h1>⚠️ Authorization Error</h1>
+          <p>${escapeHtml(errorMsg)}</p>
+          <p>Please try connecting again.</p>
+          <a href="#" onclick="navigate('/verseiq/connect'); return false;" class="spotify-btn" style="background:#1DB954;">← Back to Connect</a>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPrivacyPage() {
+    const root = document.getElementById("app-root");
+    root.innerHTML = `
+      <div class="verse-container">
+        <div class="card">
+          <span class="badge-minimal">Spotify compliant</span>
+          <h1>Privacy Policy – VerseIQ</h1>
+          <p>Last updated: April 2026</p>
+          <h2>1. Who we are</h2>
+          <p>VerseIQ is a tool under HeyRoya that analyzes publicly available Spotify metadata to help artists identify international gaps and opportunities.</p>
+          <h2>2. Data we access</h2>
+          <p>VerseIQ uses the Spotify Web API to access public metadata only: artists, tracks, albums, playlists, genres, and popularity. We do not access private listening history or private playlists.</p>
+          <h2>3. How we use the data</h2>
+          <p>We use metadata to generate analytics and insights. We do not sell data or use it for advertising.</p>
+          <h2>4. Data retention</h2>
+          <p>We minimize storage and retain data only as long as needed to provide the service. You may request deletion at any time.</p>
+          <h2>5. Contact</h2>
+          <p>Email: evaluation@roya.tech</p>
+          <hr>
+          <a href="#" onclick="navigate('/verseiq/connect'); return false;" style="color:#1DB954;">← Back to VerseIQ</a>
+        </div>
+        <footer>VerseIQ — respects Spotify Developer Policy</footer>
+      </div>
+    `;
+  }
+
+  function renderTermsPage() {
+    const root = document.getElementById("app-root");
+    root.innerHTML = `
+      <div class="verse-container">
+        <div class="card">
+          <span class="badge-minimal">Terms of Use</span>
+          <h1>Terms of Use – VerseIQ</h1>
+          <p>Last updated: April 2026</p>
+          <h2>1. Acceptance</h2>
+          <p>By using VerseIQ, you agree to these terms.</p>
+          <h2>2. Description</h2>
+          <p>VerseIQ provides analytics based on Spotify metadata to help artists identify international opportunities.</p>
+          <h2>3. Spotify API usage</h2>
+          <p>VerseIQ uses the Spotify Web API in accordance with Spotify’s Developer Terms. Your use may also be subject to Spotify’s own terms.</p>
+          <h2>4. Responsibilities</h2>
+          <p>You agree not to misuse Spotify data or attempt to reverse engineer the service.</p>
+          <h2>5. No warranty</h2>
+          <p>VerseIQ is provided “as is” without warranties.</p>
+          <h2>6. Contact</h2>
+          <p>Email: evaluation@roya.tech</p>
+          <hr>
+          <a href="#" onclick="navigate('/verseiq/connect'); return false;" style="color:#1DB954;">← Back to Connect</a>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderConnectPage() {
+    // Spotify OAuth URL builder (no scopes for public metadata)
+    // For demo, we use a mock client_id — in real scenario, use NEXT_PUBLIC_SPOTIFY_CLIENT_ID
+    // We'll construct the real authorize URL using demo placeholder but with full compliant redirect.
+    const clientId = "YOUR_SPOTIFY_CLIENT_ID";   // In production: process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
+    const redirectUri = encodeURIComponent("https://heyroya.se/callback");
+    // For this HTML demo to work without real Spotify App, we simulate but show proper URL.
+    // To be fully functional, developer would replace clientId. Meanwhile the demo displays the expected URL.
+    const scope = ""; // no scopes needed for public metadata
+    const authUrlBase = "https://accounts.spotify.com/authorize";
+    const spotifyAuthUrl = `${authUrlBase}?response_type=code&client_id=${clientId}&redirect_uri=https://heyroya.se/callback&scope=${scope}`;
+    
+    const root = document.getElementById("app-root");
+    root.innerHTML = `
+      <div class="verse-container">
+        <div class="card">
+          <span class="badge-minimal">🔒 minimal & secure</span>
+          <h1>Connect VerseIQ to Spotify</h1>
+          <p>We only access <strong>public metadata</strong> (artists, tracks, albums, genres).<br> No private listening data, no private playlists.</p>
+          <div style="background:#0e111b; padding:1rem; border-radius:1rem; margin:1.5rem 0;">
+            <p style="font-size:0.85rem;">✅ Spotify Developer Terms compliant<br>✅ Data never sold<br>✅ Stateless & secure token exchange</p>
+          </div>
+          <a href="#" id="spotifyAuthBtn" class="spotify-btn">
+            🎵 Connect with Spotify
+          </a>
+          <p style="margin-top:1.2rem; font-size:0.8rem;">By connecting, you agree to our <a href="#" onclick="navigate('/terms'); return false;" style="color:#1DB954;">Terms</a> and <a href="#" onclick="navigate('/privacy'); return false;" style="color:#1DB954;">Privacy Policy</a>.</p>
+          <hr>
+          <div class="code-block" style="font-size:0.7rem;">
+            🔐 OAuth callback: <strong>https://heyroya.se/callback</strong><br>
+            ✨ After authorization, we exchange code for token (PKCE / Basic Auth). No user data leaves secure boundary.
+          </div>
+        </div>
+        <footer>VerseIQ — built for artists, powered by Spotify Web API</footer>
+      </div>
+    `;
+    // attach real OAuth redirect (simulate full Spotify flow). In this demo, since clientId is placeholder, we show alert.
+    const btn = document.getElementById("spotifyAuthBtn");
+    if (btn) {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (clientId === "YOUR_SPOTIFY_CLIENT_ID") {
+          alert("⚙️ Demo mode: Replace with real Spotify Client ID in .env\n\nTo test full flow: set NEXT_PUBLIC_SPOTIFY_CLIENT_ID & redirect_uri https://heyroya.se/callback (or localhost). This UI fully replicates the Spotify authorization redirect.");
+          // Simulate success for demo: directly go to mock callback with fake code? For better UX, we manually trigger callback simulation.
+          // To showcase the callback page, we push a mock code param.
+          window.location.hash = "/callback?code=mock_demo_code_123";
+          renderPageFromHash();
+        } else {
+          window.location.href = spotifyAuthUrl;
+        }
+      });
+    }
+  }
+
+  function renderDashboardPage() {
+    const authenticated = isAuthenticated();
+    const root = document.getElementById("app-root");
+    root.innerHTML = `
+      <div class="verse-container">
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+            <h1>📊 VerseIQ Dashboard</h1>
+            <span class="badge-minimal" style="background:${authenticated ? '#1DB95420' : '#aa444420'}">${authenticated ? '● Active session' : '⚠️ Not connected'}</span>
+          </div>
+          <p>Your Spotify connection is ${authenticated ? 'active' : 'inactive'}. Insights ready to fuel international growth.</p>
+          ${!authenticated ? `<div style="background:#2a1e2a; padding:1rem; border-radius:1rem; margin:1rem 0;"><p>🔌 No active Spotify token. Please <a href="#" onclick="navigate('/verseiq/connect'); return false;" style="color:#1DB954;">connect your account</a>.</p></div>` : ''}
+          <h2>📈 Next steps & gap analysis</h2>
+          <ul class="insight-list">
+            <li>🌍 Fetch artist metadata & top markets</li>
+            <li>🎧 Analyze playlist gaps (curators missing your genre)</li>
+            <li>🚀 Identify international opportunities & territories</li>
+            <li>📀 Compare popularity metrics across regions</li>
+          </ul>
+          <div style="background:#0f131e; border-radius:1rem; padding:1rem; margin:1rem 0;">
+            <p><strong>🎯 Example insight (mock):</strong> “Your artist profile has 24% higher stream velocity in Berlin — consider targeted pitching.”</p>
+          </div>
+          ${authenticated ? `<button id="logoutBtn" class="spotify-btn" style="background:#2c2f3f; margin-top:0.5rem;">🔓 Disconnect & clear token</button>` : `<a href="#" onclick="navigate('/verseiq/connect'); return false;" class="spotify-btn">➕ Connect Spotify now</a>`}
+          <hr>
+          <div class="code-block" style="font-size:0.7rem;">
+            ⚡ Secure token stored locally (demo). Production uses HttpOnly cookies / DB.<br>
+            ✅ Spotify scope: none (public metadata only).
+          </div>
+        </div>
+        <footer>VerseIQ · real-time metadata intelligence</footer>
+      </div>
+    `;
+    if (authenticated) {
+      const logout = document.getElementById("logoutBtn");
+      if (logout) {
+        logout.addEventListener("click", () => {
+          clearToken();
+          renderDashboardPage(); // re-render disconnected view
+        });
+      }
+    }
+  }
+
+  // simple XSS guard
+  function escapeHtml(str) {
+    return str.replace(/[&<>]/g, function(m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+      return c;
+    });
+  }
+
+  // initial load + hashchange listener
+  window.addEventListener('load', () => {
+    renderPageFromHash();
+    window.addEventListener('hashchange', renderPageFromHash);
+  });
+
+  // also expose navigate globally
+  window.navigate = navigate;
+</script>
+
+<!-- main mount point -->
+<div id="app-root" style="min-height:100vh; display:flex; align-items:center;"></div>
+
+<!-- additional info: folder structure (visual reference) -->
+<div style="position: fixed; bottom: 12px; right: 12px; background: #0b0e16cc; backdrop-filter: blur(8px); padding: 6px 12px; border-radius: 40px; font-size: 10px; font-family: monospace; color: #7b8cae; z-index: 999;">
+  📁 /callback | /api/spotify/callback | /privacy | /terms | /verseiq/connect | /verseiq/dashboard
+</div>
+
+</body>
+</html>

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>VerseIQ · Connecting to Spotify</title>
+  <meta name="description" content="Spotify OAuth callback handler for VerseIQ — secure token exchange">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #05080f;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif;
+      color: #eef2ff;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ambient background */
+    .bg-ambient {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -2;
+      background: radial-gradient(circle at 30% 20%, #0b111c, #020408);
+    }
+    .bg-ambient::after {
+      content: "";
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(ellipse at 70% 50%, rgba(29, 185, 84, 0.08) 0%, rgba(0,0,0,0) 70%);
+      pointer-events: none;
+    }
+
+    .callback-container {
+      max-width: 520px;
+      margin: 2rem;
+      width: 100%;
+    }
+
+    .callback-card {
+      background: rgba(12, 17, 26, 0.85);
+      backdrop-filter: blur(8px);
+      border-radius: 2rem;
+      border: 1px solid rgba(29, 185, 84, 0.25);
+      padding: 2.5rem 2rem;
+      text-align: center;
+      box-shadow: 0 25px 40px -12px rgba(0, 0, 0, 0.6);
+      transition: all 0.2s ease;
+    }
+
+    .spinner-wrapper {
+      margin-bottom: 1.8rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(29, 185, 84, 0.2);
+      border-top: 3px solid #1DB954;
+      border-radius: 50%;
+      animation: spin 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      background: linear-gradient(135deg, #FFFFFF 0%, #C0F0D5 100%);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      margin-bottom: 0.75rem;
+    }
+
+    .sub-message {
+      color: #9bb2e2;
+      font-size: 0.95rem;
+      margin-top: 0.5rem;
+    }
+
+    .status-badge {
+      background: rgba(29, 185, 84, 0.12);
+      border-radius: 100px;
+      padding: 0.3rem 1rem;
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: #6fcf97;
+      display: inline-block;
+      margin-bottom: 1.2rem;
+      border: 0.5px solid rgba(29, 185, 84, 0.3);
+    }
+
+    .error-message {
+      background: rgba(220, 70, 70, 0.12);
+      border-left: 3px solid #e05a5a;
+      padding: 1rem;
+      border-radius: 1rem;
+      margin-top: 1.2rem;
+      font-size: 0.85rem;
+      color: #ffb4b4;
+    }
+
+    .retry-link {
+      display: inline-block;
+      margin-top: 1.5rem;
+      color: #6fcf97;
+      text-decoration: none;
+      font-size: 0.85rem;
+      border-bottom: 1px dotted rgba(111,207,151,0.5);
+    }
+
+    .retry-link:hover {
+      color: #1DB954;
+    }
+
+    .footer-note {
+      margin-top: 1.5rem;
+      font-size: 0.7rem;
+      text-align: center;
+      color: #5e77a5;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .callback-card {
+      animation: fadeIn 0.4s ease-out;
+    }
+  </style>
+</head>
+<body>
+<div class="bg-ambient"></div>
+<div class="callback-container">
+  <div class="callback-card" id="callbackCard">
+    <span class="status-badge" id="statusBadge">🔐 OAuth callback</span>
+    <div class="spinner-wrapper" id="spinnerContainer">
+      <div class="spinner"></div>
+    </div>
+    <h1>Connecting to Spotify…</h1>
+    <div class="sub-message" id="subMessage">Exchanging authorization code for secure access.</div>
+    <div id="errorContainer" style="min-height: 60px;"></div>
+    <a href="/verseiq/connect" class="retry-link" id="retryLink" style="display: none;">← Return to connect page</a>
+  </div>
+  <div class="footer-note">
+    VerseIQ · intelligence layer for music rights data
+  </div>
+</div>
+
+<script>
+  // --------------------------------------------------------------
+  // Spotify OAuth Callback Handler (pure HTML/JS)
+  // Equivalent to Next.js "use client" CallbackPage component.
+  // Extracts 'code' from URL, exchanges with backend API endpoint,
+  // stores token, then redirects to /verseiq dashboard.
+  // --------------------------------------------------------------
+
+  (function() {
+    // Get URL parameters (works in static HTML, no Next.js hooks needed)
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const errorParam = urlParams.get('error');
+    const stateParam = urlParams.get('state'); // optional, kept for compliance
+
+    const statusBadge = document.getElementById('statusBadge');
+    const spinnerContainer = document.getElementById('spinnerContainer');
+    const subMessageEl = document.getElementById('subMessage');
+    const errorContainer = document.getElementById('errorContainer');
+    const retryLink = document.getElementById('retryLink');
+
+    // Helper: show error state
+    function showError(errorMsg, technicalDetails = '') {
+      if (spinnerContainer) spinnerContainer.style.display = 'none';
+      if (statusBadge) {
+        statusBadge.innerText = '⚠️ Authentication error';
+        statusBadge.style.background = 'rgba(220,70,70,0.15)';
+        statusBadge.style.color = '#ffa5a5';
+      }
+      if (subMessageEl) subMessageEl.innerText = 'Unable to complete connection.';
+      if (errorContainer) {
+        errorContainer.innerHTML = `<div class="error-message">❌ ${escapeHtml(errorMsg)}${technicalDetails ? '<br><span style="font-size:0.75rem;">' + escapeHtml(technicalDetails) + '</span>' : ''}</div>`;
+      }
+      if (retryLink) retryLink.style.display = 'inline-block';
+    }
+
+    // helper: XSS-safe escape
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/[&<>]/g, function(m) {
+        if (m === '&') return '&amp;';
+        if (m === '<') return '&lt;';
+        if (m === '>') return '&gt;';
+        return m;
+      }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+        return c;
+      });
+    }
+
+    // main logic: if Spotify returned error param
+    if (errorParam) {
+      console.error('Spotify auth error:', errorParam);
+      let errorMsg = 'Authorization denied by Spotify.';
+      if (errorParam === 'access_denied') errorMsg = 'Access denied. You cancelled the connection.';
+      else if (errorParam === 'invalid_client') errorMsg = 'Invalid client configuration.';
+      showError(errorMsg, `Spotify error: ${errorParam}`);
+      return;
+    }
+
+    // No code present
+    if (!code) {
+      console.warn('No authorization code found in URL');
+      showError('Missing authorization code. Please try connecting again.', 'No "code" parameter received from Spotify.');
+      return;
+    }
+
+    // Code is present → proceed to exchange token via backend API route
+    console.log('🔑 Authorization code received, exchanging token...');
+
+    // Update UI to show exchange in progress
+    if (subMessageEl) subMessageEl.innerText = 'Verifying and exchanging token securely...';
+
+    // Construct the backend callback URL (matches Spotify compliant /api/spotify/callback)
+    // According to requirements: fetch(`/api/spotify/callback?code=${code}`)
+    const backendUrl = `/api/spotify/callback?code=${encodeURIComponent(code)}`;
+
+    // Perform token exchange (simulates Next.js API route call)
+    fetch(backendUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      }
+    })
+      .then(async (response) => {
+        // Parse JSON response (our mock / real API returns token data)
+        let data;
+        try {
+          data = await response.json();
+        } catch (err) {
+          throw new Error('Invalid response from server');
+        }
+
+        if (!response.ok) {
+          throw new Error(data.error || `Token exchange failed (${response.status})`);
+        }
+
+        // According to spec: the API should return access_token inside data
+        // For full compliance: if we receive access_token or success we store token.
+        // In our backend route (simulated or real) we return { access_token, refresh_token, ... }
+        if (data.access_token) {
+          // Store securely (localStorage used as per provided snippet)
+          localStorage.setItem('spotify_access_token', data.access_token);
+          // Also store full token data optionally for expiry handling
+          if (data.refresh_token) localStorage.setItem('spotify_refresh_token', data.refresh_token);
+          if (data.expires_in) {
+            const expiresAt = Date.now() + (data.expires_in * 1000);
+            localStorage.setItem('spotify_token_expiry', expiresAt.toString());
+          }
+          console.log('✅ Token stored successfully, redirecting to /verseiq');
+          // Redirect to VerseIQ dashboard (exactly as provided: window.location.href = "/verseiq")
+          window.location.href = "/verseiq";
+        } 
+        else if (data.success === true) {
+          // fallback: some implementations return { success: true } and token stored server-side
+          // We need to ensure client also has token? but spec says store access_token.
+          // In compliant implementation we double-check if maybe token was stored via set-cookie.
+          // For robustness: if we don't have access_token but success true, we attempt to fetch from session?
+          console.warn('API returned success but no access_token. Redirecting anyway.');
+          window.location.href = "/verseiq";
+        }
+        else {
+          throw new Error('Token response missing access_token');
+        }
+      })
+      .catch((err) => {
+        console.error('Token exchange error:', err);
+        let friendlyError = 'Failed to exchange authorization code.';
+        if (err.message.includes('fetch')) friendlyError = 'Network error. Please check your connection.';
+        showError(friendlyError, err.message || 'Backend token endpoint unreachable');
+      });
+  })();
+</script>
+</body>
+</html>
