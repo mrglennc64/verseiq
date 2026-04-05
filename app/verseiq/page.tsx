@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { computePlaylistGaps } from "./gapAnalysis";
-import { type PlaylistMetadata } from "./territory";
+import { PRO_SEARCH_URL_BY_TERRITORY, type PlaylistMetadata } from "./territory";
 import { buildRoyaltyAudit } from "./audit";
 import { computePlaylistValueScore } from "./valueScore";
 
@@ -36,6 +36,13 @@ type RightsProbeResult = {
   tracks: RightsProbeRow[];
 };
 
+type IssueFlags = {
+  missingWork: boolean;
+  wrongWriter: boolean;
+  wrongPublisher: boolean;
+  wrongShares: boolean;
+};
+
 export default function VerseIQPage() {
   const [token, setToken] = useState<string | null>(null);
   const [artistQuery, setArtistQuery] = useState("");
@@ -50,6 +57,7 @@ export default function VerseIQPage() {
   const [audit, setAudit] = useState<ReturnType<typeof buildRoyaltyAudit> | null>(null);
   const [isRunningProbe, setIsRunningProbe] = useState(false);
   const [probeResult, setProbeResult] = useState<RightsProbeResult | null>(null);
+  const [probeIssueFlags, setProbeIssueFlags] = useState<Record<number, IssueFlags>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isRefreshingToken, setIsRefreshingToken] = useState(true);
 
@@ -289,6 +297,7 @@ export default function VerseIQPage() {
       setGaps(computedGaps);
       setAudit(auditResult);
       setProbeResult(null);
+      setProbeIssueFlags({});
     } catch (error) {
       console.error(error);
       setErrorMessage(
@@ -357,6 +366,7 @@ export default function VerseIQPage() {
       }
 
       setProbeResult(data as RightsProbeResult);
+      setProbeIssueFlags({});
     } catch (error) {
       console.error(error);
       setErrorMessage(
@@ -382,9 +392,15 @@ export default function VerseIQPage() {
       "likelyGap",
       "needsManualProCheck",
       "soundexchangeStatus",
+      "missingWork",
+      "wrongWriter",
+      "wrongPublisher",
+      "wrongShares",
     ];
 
-    const rows = probeResult.tracks.map((row) => [
+    const rows = probeResult.tracks.map((row, index) => {
+      const flags = getIssueFlags(index, row);
+      return [
       row.title,
       row.artist,
       row.isrc || "",
@@ -394,7 +410,12 @@ export default function VerseIQPage() {
       row.likelyGap,
       String(row.needsManualProCheck),
       row.soundexchangeStatus,
-    ]);
+      String(flags.missingWork),
+      String(flags.wrongWriter),
+      String(flags.wrongPublisher),
+      String(flags.wrongShares),
+    ];
+    });
 
     const csv = [headers, ...rows]
       .map((line) =>
@@ -411,6 +432,72 @@ export default function VerseIQPage() {
     a.download = `verseiq-rights-probe-${Date.now()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function getIssueFlags(index: number, row: RightsProbeRow): IssueFlags {
+    const current = probeIssueFlags[index];
+    if (current) {
+      return current;
+    }
+
+    const likely = (row.likelyGap || "").toLowerCase();
+    return {
+      missingWork: likely.includes("no linked work") || likely.includes("no recording match"),
+      wrongWriter: false,
+      wrongPublisher: false,
+      wrongShares: likely.includes("iswc missing"),
+    };
+  }
+
+  function toggleIssueFlag(index: number, row: RightsProbeRow, key: keyof IssueFlags) {
+    setProbeIssueFlags((prev) => {
+      const current = prev[index] ?? getIssueFlags(index, row);
+      return {
+        ...prev,
+        [index]: {
+          ...current,
+          [key]: !current[key],
+        },
+      };
+    });
+  }
+
+  async function downloadPdfReport() {
+    if (!audit) {
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/report/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          artistName: artistSummary?.name || artistName || "Unknown artist",
+          audit,
+          probe: probeResult,
+          issueFlags: probeIssueFlags,
+          feePct: 0.2,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error?.details || error?.error || `PDF failed (HTTP ${res.status})`);
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `verseiq-audit-${Date.now()}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(
+        error instanceof Error ? `PDF download failed: ${error.message}` : "PDF download failed."
+      );
+    }
   }
 
   if (isRefreshingToken) {
@@ -564,6 +651,11 @@ export default function VerseIQPage() {
             Export Rights Probe CSV
           </button>
         ) : null}
+        {audit ? (
+          <button onClick={downloadPdfReport} style={{ marginLeft: 8 }}>
+            Download PDF Report
+          </button>
+        ) : null}
       </div>
 
       {probeResult ? (
@@ -583,6 +675,7 @@ export default function VerseIQPage() {
                 <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>Work</th>
                 <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>ISWC</th>
                 <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>Likely Gap</th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>Issue Checks</th>
               </tr>
             </thead>
             <tbody>
@@ -597,6 +690,40 @@ export default function VerseIQPage() {
                   <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>
                     {row.likelyGap}
                     {row.needsManualProCheck ? "  <- manual PRO check" : ""}
+                  </td>
+                  <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>
+                    {(["missingWork", "wrongWriter", "wrongPublisher", "wrongShares"] as const).map((key) => {
+                      const flags = getIssueFlags(idx, row);
+                      const active = flags[key];
+                      const label =
+                        key === "missingWork"
+                          ? "Missing work"
+                          : key === "wrongWriter"
+                          ? "Wrong writer"
+                          : key === "wrongPublisher"
+                          ? "Wrong publisher"
+                          : "Wrong shares";
+                      return (
+                        <button
+                          key={`${idx}-${key}`}
+                          type="button"
+                          onClick={() => toggleIssueFlag(idx, row, key)}
+                          style={{
+                            marginRight: 6,
+                            marginBottom: 4,
+                            cursor: "pointer",
+                            borderRadius: 4,
+                            border: "1px solid #355",
+                            background: active ? "#1b4f2e" : "#111a2a",
+                            color: "#dce7ff",
+                            padding: "2px 6px",
+                            fontSize: 11,
+                          }}
+                        >
+                          {active ? "[x]" : "[ ]"} {label}
+                        </button>
+                      );
+                    })}
                   </td>
                 </tr>
               ))}
@@ -629,7 +756,20 @@ export default function VerseIQPage() {
               {audit.territoryRows.map((row) => (
                 <tr key={row.territory}>
                   <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>{row.territory}</td>
-                  <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>{row.pro}</td>
+                  <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>
+                    {PRO_SEARCH_URL_BY_TERRITORY[row.territory] ? (
+                      <a
+                        href={PRO_SEARCH_URL_BY_TERRITORY[row.territory]}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: "#9ad0ff" }}
+                      >
+                        {row.pro}
+                      </a>
+                    ) : (
+                      row.pro
+                    )}
+                  </td>
                   <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>{row.playlists}</td>
                   <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>{row.followers.toLocaleString()}</td>
                   <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>

@@ -9,6 +9,15 @@ export const PRO_BY_TERRITORY: Record<TerritoryCode, string> = {
   OTHER: "Unknown",
 };
 
+export const PRO_SEARCH_URL_BY_TERRITORY: Record<TerritoryCode, string> = {
+  SE: "https://www.stim.se/en/music-creators/search-music",
+  DE: "https://www.gema.de/en/repertoires",
+  FR: "https://repertoire.sacem.fr/",
+  UK: "https://www.prsformusic.com/works-search",
+  US: "https://repertoire.soundexchange.com/",
+  OTHER: "",
+};
+
 const SE_KEYWORDS = ["sweden", "sverige", "svensk", "rix fm", "nrj sweden", "vm låtar"];
 const DE_KEYWORDS = ["germany", "deutschland", "deutsche", "berlin", "hamburg"];
 const FR_KEYWORDS = ["france", "français", "francais", "paris"];
