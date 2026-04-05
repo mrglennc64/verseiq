@@ -89,12 +89,12 @@ export default function VerseIQPage() {
       }).toString()
     : null;
 
-  async function fetchAnalysisData(accessToken: string) {
+  async function fetchAnalysisData(accessToken: string, nameForPlaylists: string) {
     const [artistRes, playlistsRes, refRes] = await Promise.all([
       fetch(`/api/spotify/artist?id=${artistId}&token=${accessToken}`),
-      fetch(`/api/spotify/playlists?artist=${encodeURIComponent(artistName)}&token=${accessToken}`),
+      fetch(`/api/spotify/playlists?artist=${encodeURIComponent(nameForPlaylists)}&token=${accessToken}`),
       fetch(
-        `/api/spotify/playlists?artist=${encodeURIComponent(`${artistName} international`)}&token=${accessToken}`
+        `/api/spotify/playlists?artist=${encodeURIComponent(`${nameForPlaylists} international`)}&token=${accessToken}`
       ),
     ]);
 
@@ -180,7 +180,13 @@ export default function VerseIQPage() {
         throw new Error(data?.details || data?.error || `Artist search failed (HTTP ${res.status})`);
       }
 
-      setArtistMatches(Array.isArray(data?.artists) ? data.artists : []);
+      const matches = Array.isArray(data?.artists) ? data.artists : [];
+      setArtistMatches(
+        matches.sort(
+          (a: ArtistSearchResult, b: ArtistSearchResult) =>
+            b.followers - a.followers || b.popularity - a.popularity
+        )
+      );
     } catch (error) {
       console.error(error);
       setErrorMessage(
@@ -196,18 +202,32 @@ export default function VerseIQPage() {
     setArtistName(artist.name);
     setArtistQuery(artist.name);
     setArtistMatches([]);
+    setErrorMessage(null);
   }
 
   async function fetchArtistAndPlaylists() {
     setErrorMessage(null);
 
-    if (!token || !artistId || !artistName) {
-      setErrorMessage("Please provide Artist ID and Artist Name before running analysis.");
+    if (!token || !artistId) {
+      setErrorMessage("Please provide Artist ID before running analysis.");
       return;
     }
 
     try {
-      let analysis = await fetchAnalysisData(token);
+      let effectiveArtistName = artistName.trim();
+
+      // If user selected/pasted only Artist ID, resolve the artist name automatically.
+      if (!effectiveArtistName) {
+        const artistLookupRes = await fetch(`/api/spotify/artist?id=${artistId}&token=${token}`);
+        const artistLookupData = await artistLookupRes.json().catch(() => ({}));
+        if (!artistLookupRes.ok || !artistLookupData?.name) {
+          throw new Error("Could not resolve artist name from Artist ID.");
+        }
+        effectiveArtistName = artistLookupData.name;
+        setArtistName(effectiveArtistName);
+      }
+
+      let analysis = await fetchAnalysisData(token, effectiveArtistName);
 
       const hasUnauthorized = [analysis.artist, analysis.playlists, analysis.reference].some(
         (entry) => entry.response.status === 401
@@ -216,7 +236,7 @@ export default function VerseIQPage() {
       if (hasUnauthorized) {
         const refreshedToken = await refreshAccessTokenIfPossible();
         if (refreshedToken) {
-          analysis = await fetchAnalysisData(refreshedToken);
+          analysis = await fetchAnalysisData(refreshedToken, effectiveArtistName);
         }
       }
 
@@ -314,6 +334,12 @@ export default function VerseIQPage() {
           <input
             value={artistQuery}
             onChange={(event) => setArtistQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void searchArtists();
+              }
+            }}
             style={{ width: 260 }}
             placeholder="Search by artist name"
           />
@@ -325,11 +351,11 @@ export default function VerseIQPage() {
           <ul style={{ marginTop: 8, marginBottom: 12, maxWidth: 720 }}>
             {artistMatches.map((artist) => (
               <li key={artist.id} style={{ marginBottom: 6 }}>
-                <button
-                  onClick={() => selectArtist(artist)}
-                  style={{ cursor: "pointer" }}
-                >
+                <span>
                   {artist.name} · {artist.followers.toLocaleString()} followers · popularity {artist.popularity}
+                </span>{" "}
+                <button type="button" onClick={() => selectArtist(artist)} style={{ cursor: "pointer" }}>
+                  Select
                 </button>
               </li>
             ))}
