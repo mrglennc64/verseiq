@@ -131,11 +131,7 @@ export default function HomePage() {
         <div className="hero">
           <span className="badge-soon">Intelligence layer</span>
           <h1>VerseIQ</h1>
-          <div className="hero-sub">Intelligence layer for music rights data.</div>
-          <p className="hero-desc">
-            VerseIQ is being developed to analyze and improve the structure, consistency, and visibility
-            of music rights data across territories.
-          </p>
+          <div className="hero-sub">VerseIQ is a royalty intelligence platform that maps and analyzes global music rights data, identifying gaps in metadata and territorial coverage.</div>
         </div>
 
         <div className="section">
