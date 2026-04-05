@@ -27,7 +27,14 @@ export async function GET(req: NextRequest) {
   if (!tokenRes.ok) {
     const text = await tokenRes.text();
     console.error("Spotify token error:", text);
-    return NextResponse.json({ error: "Token exchange failed" }, { status: 500 });
+    let details = text;
+    try {
+      const parsed = JSON.parse(text);
+      details = parsed?.error_description || parsed?.error || text;
+    } catch {
+      // Keep raw response text for debugging when JSON parse fails.
+    }
+    return NextResponse.json({ error: "Token exchange failed", details }, { status: 500 });
   }
 
   const tokenData = await tokenRes.json();

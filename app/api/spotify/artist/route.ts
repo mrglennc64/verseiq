@@ -15,7 +15,16 @@ export async function GET(req: NextRequest) {
   if (!resSpotify.ok) {
     const text = await resSpotify.text();
     console.error("Spotify artist error:", text);
-    return NextResponse.json({ error: "Spotify artist fetch failed" }, { status: 500 });
+    let details = text;
+    try {
+      const parsed = JSON.parse(text);
+      details = parsed?.error?.message || parsed?.error || text;
+    } catch {
+      // Keep raw response text when JSON parsing fails.
+    }
+
+    const status = resSpotify.status === 401 ? 401 : 500;
+    return NextResponse.json({ error: "Spotify artist fetch failed", details }, { status });
   }
 
   const data = await resSpotify.json();

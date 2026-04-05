@@ -1,29 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
-  const artistName = req.nextUrl.searchParams.get("artist");
-  const accessToken = req.nextUrl.searchParams.get("token");
+  const artist = req.nextUrl.searchParams.get("artist");
+  const token = req.nextUrl.searchParams.get("token");
 
-  if (!artistName || !accessToken) {
+  if (!artist || !token) {
     return NextResponse.json({ error: "Missing artist or token" }, { status: 400 });
   }
 
-  const searchParams = new URLSearchParams({
-    q: artistName,
-    type: "playlist",
-    limit: "10",
-  });
+  // Sanitize query
+  const cleanArtist = artist.replace(/[^a-zA-Z0-9 äöåÄÖÅ]/g, " ").trim();
 
-  const resSpotify = await fetch(`https://api.spotify.com/v1/search?${searchParams.toString()}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+  const url =
+    "https://api.spotify.com/v1/search?" +
+    new URLSearchParams({
+      q: cleanArtist,
+      type: "playlist",
+      limit: "10",
+    });
+
+  const resSpotify = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
   });
 
   if (!resSpotify.ok) {
     const text = await resSpotify.text();
-    console.error("Spotify playlists error:", text);
-    return NextResponse.json({ error: "Spotify playlist fetch failed" }, { status: 500 });
+    console.error("Spotify playlist error:", text);
+    return NextResponse.json(
+      { error: "Spotify playlist fetch failed", details: text },
+      { status: 500 }
+    );
   }
 
   const data = await resSpotify.json();
-  return NextResponse.json(data);
+  const items = Array.isArray(data.playlists?.items) ? data.playlists.items : [];
+
+  // Followers are NOT available in search results
+  const normalized = items
+    .filter((p: any) => p && p.id)
+    .map((p: any) => ({
+    id: p.id,
+    name: p.name ?? "",
+    followers: 0,
+    description: p.description ?? "",
+    ownerName: p.owner?.display_name ?? "",
+    ownerType: p.owner?.type ?? "",
+    isEditorial: p.owner?.id === "spotify",
+  }));
+
+  return NextResponse.json({ playlists: normalized });
 }
