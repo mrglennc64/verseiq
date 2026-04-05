@@ -27,6 +27,11 @@ export type PlaylistMetadata = {
   ownerName: string;
   ownerType: string;
   isEditorial: boolean;
+  tracks?: Array<{
+    title: string;
+    artist: string;
+    isrc?: string;
+  }>;
 };
 
 export function inferTerritoryFromPlaylist(playlist: {

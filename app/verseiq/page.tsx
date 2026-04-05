@@ -13,6 +13,29 @@ type ArtistSearchResult = {
   popularity: number;
 };
 
+type RightsProbeRow = {
+  title: string;
+  artist: string;
+  isrc: string | null;
+  hasRecording: boolean;
+  hasWork: boolean;
+  hasIswc: boolean;
+  likelyGap: string;
+  needsManualProCheck: boolean;
+  soundexchangeStatus: string;
+};
+
+type RightsProbeResult = {
+  artistName: string;
+  summary: {
+    checkedTracks: number;
+    missingIsrc: number;
+    missingIswc: number;
+    needsManualProCheck: number;
+  };
+  tracks: RightsProbeRow[];
+};
+
 export default function VerseIQPage() {
   const [token, setToken] = useState<string | null>(null);
   const [artistQuery, setArtistQuery] = useState("");
@@ -25,6 +48,8 @@ export default function VerseIQPage() {
   const [referencePlaylists, setReferencePlaylists] = useState<PlaylistMetadata[]>([]);
   const [gaps, setGaps] = useState<PlaylistMetadata[]>([]);
   const [audit, setAudit] = useState<ReturnType<typeof buildRoyaltyAudit> | null>(null);
+  const [isRunningProbe, setIsRunningProbe] = useState(false);
+  const [probeResult, setProbeResult] = useState<RightsProbeResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isRefreshingToken, setIsRefreshingToken] = useState(true);
 
@@ -263,6 +288,7 @@ export default function VerseIQPage() {
       setReferencePlaylists(refPlaylists);
       setGaps(computedGaps);
       setAudit(auditResult);
+      setProbeResult(null);
     } catch (error) {
       console.error(error);
       setErrorMessage(
@@ -281,6 +307,111 @@ export default function VerseIQPage() {
       })
       .sort((a, b) => b.value.score - a.value.score);
   }, [gaps, artistName]);
+
+  function collectProbeTracks() {
+    const seen = new Set<string>();
+
+    const tracks = scoredGaps
+      .flatMap(({ playlist }) => (Array.isArray(playlist.tracks) ? playlist.tracks : []))
+      .filter((track) => track?.title && track?.artist)
+      .filter((track) => {
+        const key = `${track.title.toLowerCase()}::${track.artist.toLowerCase()}`;
+        if (seen.has(key)) {
+          return false;
+        }
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 20)
+      .map((track) => ({
+        title: track.title,
+        artist: track.artist,
+        isrc: track.isrc,
+      }));
+
+    return tracks;
+  }
+
+  async function runRightsProbe() {
+    const probeTracks = collectProbeTracks();
+    const effectiveArtistName = artistSummary?.name || artistName || "Unknown artist";
+
+    if (probeTracks.length === 0) {
+      setErrorMessage("No track snippets available in gap playlists for rights probing yet.");
+      return;
+    }
+
+    setErrorMessage(null);
+    setIsRunningProbe(true);
+
+    try {
+      const res = await fetch("/api/gap-finder/probe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artistName: effectiveArtistName, tracks: probeTracks }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.details || data?.error || `Probe failed (HTTP ${res.status})`);
+      }
+
+      setProbeResult(data as RightsProbeResult);
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(
+        error instanceof Error ? `Rights probe failed: ${error.message}` : "Rights probe failed."
+      );
+    } finally {
+      setIsRunningProbe(false);
+    }
+  }
+
+  function downloadProbeCsv() {
+    if (!probeResult) {
+      return;
+    }
+
+    const headers = [
+      "title",
+      "artist",
+      "isrc",
+      "hasRecording",
+      "hasWork",
+      "hasIswc",
+      "likelyGap",
+      "needsManualProCheck",
+      "soundexchangeStatus",
+    ];
+
+    const rows = probeResult.tracks.map((row) => [
+      row.title,
+      row.artist,
+      row.isrc || "",
+      String(row.hasRecording),
+      String(row.hasWork),
+      String(row.hasIswc),
+      row.likelyGap,
+      String(row.needsManualProCheck),
+      row.soundexchangeStatus,
+    ]);
+
+    const csv = [headers, ...rows]
+      .map((line) =>
+        line
+          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+          .join(",")
+      )
+      .join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `verseiq-rights-probe-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   if (isRefreshingToken) {
     return (
@@ -424,6 +555,56 @@ export default function VerseIQPage() {
         ))}
       </ul>
 
+      <div style={{ marginTop: 16, marginBottom: 16 }}>
+        <button onClick={runRightsProbe} disabled={isRunningProbe}>
+          {isRunningProbe ? "Running Rights Probe..." : "Run Rights Probe"}
+        </button>
+        {probeResult ? (
+          <button onClick={downloadProbeCsv} style={{ marginLeft: 8 }}>
+            Export Rights Probe CSV
+          </button>
+        ) : null}
+      </div>
+
+      {probeResult ? (
+        <div style={{ marginTop: 8 }}>
+          <h3>Rights Probe Summary</h3>
+          <p>
+            Checked tracks: {probeResult.summary.checkedTracks} · Missing ISRC: {probeResult.summary.missingIsrc} · Missing ISWC: {probeResult.summary.missingIswc} · Manual checks: {probeResult.summary.needsManualProCheck}
+          </p>
+
+          <table style={{ borderCollapse: "collapse", width: "100%", maxWidth: 1100 }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>Track</th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>Artist</th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>ISRC</th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>Recording</th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>Work</th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>ISWC</th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>Likely Gap</th>
+              </tr>
+            </thead>
+            <tbody>
+              {probeResult.tracks.map((row, idx) => (
+                <tr key={`${row.title}-${row.artist}-${idx}`}>
+                  <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>{row.title}</td>
+                  <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>{row.artist}</td>
+                  <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>{row.isrc || "-"}</td>
+                  <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>{row.hasRecording ? "Yes" : "No"}</td>
+                  <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>{row.hasWork ? "Yes" : "No"}</td>
+                  <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>{row.hasIswc ? "Yes" : "No"}</td>
+                  <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>
+                    {row.likelyGap}
+                    {row.needsManualProCheck ? "  <- manual PRO check" : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
       {audit ? (
         <div style={{ marginTop: 40 }}>
           <h2>VerseIQ Royalty Audit Summary</h2>
@@ -441,6 +622,7 @@ export default function VerseIQPage() {
                 <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>Missing Playlists</th>
                 <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>Followers</th>
                 <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>Est. Range (EUR)</th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid #334", padding: "8px 6px" }}>Manual PRO Check</th>
               </tr>
             </thead>
             <tbody>
@@ -452,6 +634,10 @@ export default function VerseIQPage() {
                   <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>{row.followers.toLocaleString()}</td>
                   <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>
                     EUR {row.minRoyalty.toFixed(0)} - EUR {row.maxRoyalty.toFixed(0)}
+                    {row.needsManualProCheck ? "  <- manual PRO check" : ""}
+                  </td>
+                  <td style={{ borderBottom: "1px solid #223", padding: "8px 6px" }}>
+                    {row.needsManualProCheck ? "Yes" : "No"}
                   </td>
                 </tr>
               ))}
@@ -469,6 +655,21 @@ export default function VerseIQPage() {
             <li>
               Neighboring rights: EUR {audit.split.neighboring.min.toFixed(0)} - EUR {audit.split.neighboring.max.toFixed(0)}
             </li>
+          </ul>
+
+          <h3>Manual PRO Check Checklist</h3>
+          <ul>
+            {audit.territoryRows.filter((row) => row.needsManualProCheck).length === 0 ? (
+              <li>No manual PRO checks required for this run.</li>
+            ) : (
+              audit.territoryRows
+                .filter((row) => row.needsManualProCheck)
+                .map((row) => (
+                  <li key={`check-${row.territory}`}>
+                    {row.territory} ({row.pro}): check repertoire for {artistSummary?.name || artistName || "selected artist"} and key works.
+                  </li>
+                ))
+            )}
           </ul>
         </div>
       ) : null}

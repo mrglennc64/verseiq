@@ -2,17 +2,20 @@ import { aggregateGapsByTerritory, PRO_BY_TERRITORY, type PlaylistMetadata, type
 import { estimateRoyaltyRangeForTerritory, splitRoyaltyIntoSources } from "./royalty";
 import { computeRoyaltyHealthScore } from "./health";
 
+export type TerritoryRow = {
+  territory: TerritoryCode;
+  pro: string;
+  playlists: number;
+  followers: number;
+  minRoyalty: number;
+  maxRoyalty: number;
+  needsManualProCheck: boolean;
+};
+
 export function buildRoyaltyAudit(gaps: PlaylistMetadata[]) {
   const byTerritory = aggregateGapsByTerritory(gaps);
 
-  const territoryRows: {
-    territory: TerritoryCode;
-    pro: string;
-    playlists: number;
-    followers: number;
-    minRoyalty: number;
-    maxRoyalty: number;
-  }[] = [];
+  const territoryRows: TerritoryRow[] = [];
 
   let globalMin = 0;
   let globalMax = 0;
@@ -31,13 +34,16 @@ export function buildRoyaltyAudit(gaps: PlaylistMetadata[]) {
     globalMin += minRoyalty;
     globalMax += maxRoyalty;
 
+    const pro = PRO_BY_TERRITORY[territory];
+
     territoryRows.push({
       territory,
-      pro: PRO_BY_TERRITORY[territory],
+      pro,
       playlists: playlists.length,
       followers: totalFollowers,
       minRoyalty,
       maxRoyalty,
+      needsManualProCheck: totalFollowers > 0 && pro !== "Unknown",
     });
   });
 

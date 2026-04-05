@@ -20,6 +20,42 @@ async function fetchPlaylistDetails(playlistId: string, token: string) {
   return detailsRes.json();
 }
 
+async function fetchPlaylistTracks(playlistId: string, token: string) {
+  const tracksRes = await fetch(
+    `https://api.spotify.com/v1/playlists/${playlistId}/tracks?` +
+      new URLSearchParams({
+        limit: "12",
+        fields: "items(track(name,external_ids(isrc),artists(name)))",
+      }),
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+
+  if (!tracksRes.ok) {
+    const text = await tracksRes.text();
+    console.error("Spotify error:", text);
+    return [];
+  }
+
+  const data = await tracksRes.json();
+  const items = Array.isArray(data?.items) ? data.items : [];
+
+  return items
+    .map((item: any) => {
+      const track = item?.track;
+      if (!track?.name) {
+        return null;
+      }
+      return {
+        title: track.name,
+        artist: Array.isArray(track.artists) ? track.artists[0]?.name || "" : "",
+        isrc: track.external_ids?.isrc || undefined,
+      };
+    })
+    .filter(Boolean);
+}
+
 export async function GET(req: NextRequest) {
   const artist = req.nextUrl.searchParams.get("artist");
   const token = req.nextUrl.searchParams.get("token");
@@ -59,6 +95,7 @@ export async function GET(req: NextRequest) {
   const enriched = await Promise.allSettled(
     candidates.map(async (playlist: any) => {
       const details = await fetchPlaylistDetails(playlist.id, token);
+      const tracks = await fetchPlaylistTracks(playlist.id, token);
       return {
         id: playlist.id,
         name: playlist.name ?? details?.name ?? "",
@@ -67,6 +104,7 @@ export async function GET(req: NextRequest) {
         ownerName: details?.owner?.display_name ?? playlist.owner?.display_name ?? "",
         ownerType: details?.owner?.type ?? playlist.owner?.type ?? "",
         isEditorial: (details?.owner?.id ?? playlist.owner?.id) === "spotify",
+        tracks,
       };
     })
   );
