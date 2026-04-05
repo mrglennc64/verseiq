@@ -43,6 +43,39 @@ type IssueFlags = {
   wrongShares: boolean;
 };
 
+type USProbeTrackRow = {
+  isrc: string;
+  missingInSoundExchange: boolean;
+  usPlaylistFollowers: number;
+  usRadioLinkedPlaylists: number;
+  score: number;
+};
+
+type USProbeResult = {
+  artistName: string;
+  date: string;
+  feePercent: number;
+  inputCounts: {
+    tracks: number;
+    usPlaylists: number;
+  };
+  audit: {
+    artistName: string;
+    tracks: USProbeTrackRow[];
+    totalEstimatedRange: { min: number; max: number };
+    feeRange: { min: number; max: number };
+  };
+  artistScore: {
+    artistName: string;
+    recoveryPotentialScore: number;
+  };
+  seGaps: Array<{
+    isrc: string;
+    reason: string;
+  }>;
+  lod: string;
+};
+
 export default function VerseIQPage() {
   const [token, setToken] = useState<string | null>(null);
   const [artistQuery, setArtistQuery] = useState("");
@@ -56,7 +89,9 @@ export default function VerseIQPage() {
   const [gaps, setGaps] = useState<PlaylistMetadata[]>([]);
   const [audit, setAudit] = useState<ReturnType<typeof buildRoyaltyAudit> | null>(null);
   const [isRunningProbe, setIsRunningProbe] = useState(false);
+  const [isRunningUsProbe, setIsRunningUsProbe] = useState(false);
   const [probeResult, setProbeResult] = useState<RightsProbeResult | null>(null);
+  const [usProbeResult, setUsProbeResult] = useState<USProbeResult | null>(null);
   const [probeIssueFlags, setProbeIssueFlags] = useState<Record<number, IssueFlags>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isRefreshingToken, setIsRefreshingToken] = useState(true);
@@ -297,6 +332,7 @@ export default function VerseIQPage() {
       setGaps(computedGaps);
       setAudit(auditResult);
       setProbeResult(null);
+      setUsProbeResult(null);
       setProbeIssueFlags({});
     } catch (error) {
       console.error(error);
@@ -366,6 +402,7 @@ export default function VerseIQPage() {
       }
 
       setProbeResult(data as RightsProbeResult);
+      setUsProbeResult(null);
       setProbeIssueFlags({});
     } catch (error) {
       console.error(error);
@@ -375,6 +412,83 @@ export default function VerseIQPage() {
     } finally {
       setIsRunningProbe(false);
     }
+  }
+
+  async function runUSProbe() {
+    if (!probeResult) {
+      setErrorMessage("Run Rights Probe first so ISRC-resolved tracks are available.");
+      return;
+    }
+
+    const artist = artistSummary?.name || artistName || "Unknown artist";
+    const tracksForUS = probeResult.tracks
+      .filter((track) => track.isrc)
+      .map((track) => ({
+        isrc: track.isrc,
+        title: track.title,
+        artist: track.artist,
+      }));
+
+    if (tracksForUS.length === 0) {
+      setErrorMessage("US Probe requires at least one track with a resolved ISRC.");
+      return;
+    }
+
+    const soundExchangeMatches = probeResult.tracks
+      .filter((track) => track.isrc)
+      .map((track) => {
+        const status = (track.soundexchangeStatus || "").toLowerCase();
+        const found = status.includes("found") || status.includes("registered");
+        return {
+          isrc: track.isrc as string,
+          found,
+          title: track.title,
+          artist: track.artist,
+        };
+      });
+
+    setErrorMessage(null);
+    setIsRunningUsProbe(true);
+
+    try {
+      const res = await fetch("/api/us-probe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          artistName: artist,
+          tracks: tracksForUS,
+          playlists: gaps,
+          soundExchangeMatches,
+          feePercent: 20,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.details || data?.error || `US Probe failed (HTTP ${res.status})`);
+      }
+
+      setUsProbeResult(data as USProbeResult);
+    } catch (error) {
+      console.error(error);
+      setErrorMessage(error instanceof Error ? error.message : "US Probe failed.");
+    } finally {
+      setIsRunningUsProbe(false);
+    }
+  }
+
+  function downloadUSLod() {
+    if (!usProbeResult?.lod) {
+      return;
+    }
+
+    const blob = new Blob([usProbeResult.lod], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `verseiq-soundexchange-lod-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   function downloadProbeCsv() {
@@ -473,6 +587,8 @@ export default function VerseIQPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           artistName: artistSummary?.name || artistName || "Unknown artist",
+          mode: usProbeResult ? "us" : "global",
+          usProbe: usProbeResult,
           audit,
           probe: probeResult,
           issueFlags: probeIssueFlags,
@@ -646,6 +762,13 @@ export default function VerseIQPage() {
         <button onClick={runRightsProbe} disabled={isRunningProbe}>
           {isRunningProbe ? "Running Rights Probe..." : "Run Rights Probe"}
         </button>
+        <button
+          onClick={runUSProbe}
+          disabled={isRunningUsProbe || !probeResult}
+          style={{ marginLeft: 8 }}
+        >
+          {isRunningUsProbe ? "Running US Probe..." : "Run US Probe"}
+        </button>
         {probeResult ? (
           <button onClick={downloadProbeCsv} style={{ marginLeft: 8 }}>
             Export Rights Probe CSV
@@ -729,6 +852,41 @@ export default function VerseIQPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      ) : null}
+
+      {usProbeResult ? (
+        <div style={{ marginTop: 28 }}>
+          <h2>US Priority Audit</h2>
+          <p>
+            US recovery potential score: {usProbeResult.artistScore.recoveryPotentialScore} / 100
+          </p>
+          <p>
+            Estimated unclaimed US royalties: EUR {usProbeResult.audit.totalEstimatedRange.min.toFixed(0)} - EUR {usProbeResult.audit.totalEstimatedRange.max.toFixed(0)}
+          </p>
+          <p>
+            Estimated fee ({usProbeResult.feePercent}%): EUR {usProbeResult.audit.feeRange.min.toFixed(0)} - EUR {usProbeResult.audit.feeRange.max.toFixed(0)}
+          </p>
+          <p>
+            Inputs used: {usProbeResult.inputCounts.tracks} ISRC tracks, {usProbeResult.inputCounts.usPlaylists} US playlists
+          </p>
+
+          {usProbeResult.seGaps.length > 0 ? (
+            <>
+              <h3>SoundExchange Missing Registrations</h3>
+              <ul>
+                {usProbeResult.seGaps.map((gap) => (
+                  <li key={gap.isrc}>
+                    {gap.isrc}: {gap.reason}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p>No SoundExchange registration gaps found for provided ISRCs.</p>
+          )}
+
+          <button onClick={downloadUSLod}>Download SoundExchange LOD</button>
         </div>
       ) : null}
 

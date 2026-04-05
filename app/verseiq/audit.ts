@@ -12,7 +12,19 @@ export type TerritoryRow = {
   needsManualProCheck: boolean;
 };
 
-export function buildRoyaltyAudit(gaps: PlaylistMetadata[]) {
+export type RoyaltyAudit = {
+  territoryRows: TerritoryRow[];
+  globalMin: number;
+  globalMax: number;
+  split: {
+    streaming: { min: number; max: number };
+    performance: { min: number; max: number };
+    neighboring: { min: number; max: number };
+  };
+  healthScore: number;
+};
+
+export function buildRoyaltyAudit(gaps: PlaylistMetadata[]): RoyaltyAudit {
   const byTerritory = aggregateGapsByTerritory(gaps);
 
   const territoryRows: TerritoryRow[] = [];
