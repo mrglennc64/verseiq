@@ -34,7 +34,7 @@ async function fetchPlaylistTracks(playlistId: string, token: string) {
 
   if (!tracksRes.ok) {
     const text = await tracksRes.text();
-    console.error("Spotify error:", text);
+    console.error(`[fetchPlaylistTracks] Spotify error for ${playlistId}:`, text);
     return [];
   }
 
@@ -112,6 +112,11 @@ export async function GET(req: NextRequest) {
   const normalized = enriched
     .filter((result): result is PromiseFulfilledResult<any> => result.status === "fulfilled")
     .map((result) => result.value);
+
+  console.log(
+    `[Spotify Playlists] Fetched ${normalized.length} playlists for "${cleanArtist}". Track counts:`,
+    normalized.map((p) => ({ name: p.name, tracks: Array.isArray(p.tracks) ? p.tracks.length : 0 }))
+  );
 
   return NextResponse.json({ playlists: normalized });
 }
