@@ -214,6 +214,62 @@ select {
   color: var(--ink-soft);
 }
 
+.workflow-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.workflow-summary-card {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(108, 170, 155, 0.18);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.workflow-summary-card--warn {
+  background: rgba(178, 79, 93, 0.08);
+  border-color: rgba(178, 79, 93, 0.2);
+}
+
+.workflow-summary-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.workflow-summary-value {
+  margin-top: 8px;
+  font-size: 1.45rem;
+  font-weight: 700;
+}
+
+.workflow-summary-copy {
+  margin-top: 6px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.workflow-warning-block {
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(178, 79, 93, 0.2);
+  background: rgba(178, 79, 93, 0.06);
+}
+
+.workflow-warning-block h3 {
+  margin: 0 0 8px;
+}
+
+.workflow-warning-list {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--ink-soft);
+  line-height: 1.7;
+}
+
 .se-audit-card {
   border: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(243, 250, 247, 0.74));
@@ -334,6 +390,10 @@ select {
   .se-audit-card {
     padding: 18px;
     border-radius: 16px;
+  }
+
+  .workflow-summary-grid {
+    grid-template-columns: 1fr;
   }
 
   .se-audit-card__metrics {

@@ -3,16 +3,31 @@
 import { useEffect, useRef, useState } from "react";
 import { SoundexchangeAuditCard } from "../../components/SoundexchangeAuditCard";
 import type { GapReport } from "../../types/gapReport";
-
-type ExportedCatalog = {
-  artistId: string;
-  artistName: string;
-  uniqueIsrcs: number;
-  csv: string;
-};
+import type { ExportedCatalog } from "../../types/spotifyCatalog";
 
 function buildCsvFile(content: string, fileName: string) {
   return new File([content], fileName, { type: "text/csv;charset=utf-8" });
+}
+
+function slugifyFileName(value: string) {
+  return value.replace(/[^a-z0-9]+/gi, "_").toLowerCase();
+}
+
+function describeInput(input: string) {
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (/playlist\//i.test(trimmed)) {
+    return "Playlist detected. Workflow will scan every unique track in this playlist.";
+  }
+  if (/artist\//i.test(trimmed)) {
+    return "Artist detected. Workflow will scan albums, singles, and appearances for this artist.";
+  }
+  if (/track\//i.test(trimmed)) {
+    return "Track links are not supported here. Use an artist URL, playlist URL, or raw artist ID.";
+  }
+  return "Raw Spotify artist ID detected. Workflow will resolve the artist and scan the catalog.";
 }
 
 function downloadCsv(content: string, fileName: string) {
@@ -27,7 +42,8 @@ function downloadCsv(content: string, fileName: string) {
 
 export default function VerseIQPage() {
   const [token, setToken] = useState<string | null>(null);
-  const [artistInput, setArtistInput] = useState("");
+  const [authorizeUrl, setAuthorizeUrl] = useState<string | null>(null);
+  const [catalogInput, setCatalogInput] = useState("");
   const [exportedCatalog, setExportedCatalog] = useState<ExportedCatalog | null>(null);
   const [report, setReport] = useState<GapReport | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -80,6 +96,24 @@ export default function VerseIQPage() {
     resolveToken();
   }, []);
 
+  useEffect(() => {
+    async function resolveAuthorizeUrl() {
+      try {
+        const res = await fetch("/api/spotify/authorize-url");
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.authorizeUrl) {
+          setAuthorizeUrl(String(data.authorizeUrl));
+          return;
+        }
+        setAuthorizeUrl(null);
+      } catch {
+        setAuthorizeUrl(null);
+      }
+    }
+
+    resolveAuthorizeUrl();
+  }, []);
+
   async function refreshAccessTokenIfPossible() {
     const refreshToken = window.localStorage.getItem("spotify_refresh_token");
     if (!refreshToken) {
@@ -114,23 +148,10 @@ export default function VerseIQPage() {
     setErrorMessage(null);
   }
 
-  const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID;
-  const redirectUri = process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI ?? "https://useverseiq.com/callback";
-  const authorizeUrl = clientId
-    ? "https://accounts.spotify.com/authorize?" +
-      new URLSearchParams({
-        response_type: "code",
-        client_id: clientId,
-        redirect_uri: redirectUri,
-        scope: "",
-        show_dialog: "false",
-      }).toString()
-    : null;
-
   async function exportSpotifyCatalog() {
-    const trimmedArtistInput = artistInput.trim();
-    if (!token || !trimmedArtistInput) {
-      setErrorMessage("Paste a Spotify artist URL or artist ID before exporting.");
+    const trimmedInput = catalogInput.trim();
+    if (!trimmedInput) {
+      setErrorMessage("Paste a Spotify artist URL, playlist URL, or raw artist ID before scanning.");
       return;
     }
 
@@ -139,16 +160,19 @@ export default function VerseIQPage() {
 
     try {
       let activeToken = token;
+      const baseUrl = `/api/spotify/export-catalog?input=${encodeURIComponent(trimmedInput)}`;
       let res = await fetch(
-        `/api/spotify/export-catalog?artist=${encodeURIComponent(trimmedArtistInput)}&token=${encodeURIComponent(activeToken)}`
+        activeToken
+          ? `${baseUrl}&token=${encodeURIComponent(activeToken)}`
+          : baseUrl
       );
 
-      if (res.status === 401) {
+      if (res.status === 401 && activeToken) {
         const refreshedToken = await refreshAccessTokenIfPossible();
         if (refreshedToken) {
           activeToken = refreshedToken;
           res = await fetch(
-            `/api/spotify/export-catalog?artist=${encodeURIComponent(trimmedArtistInput)}&token=${encodeURIComponent(activeToken)}`
+            `/api/spotify/export-catalog?input=${encodeURIComponent(trimmedInput)}&token=${encodeURIComponent(activeToken)}`
           );
         }
       }
@@ -161,10 +185,6 @@ export default function VerseIQPage() {
       const nextCatalog = data as ExportedCatalog;
       setExportedCatalog(nextCatalog);
       setReport(null);
-      downloadCsv(
-        nextCatalog.csv,
-        `${nextCatalog.artistName.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_spotify_catalog.csv`
-      );
     } catch (error) {
       console.error(error);
       setErrorMessage(
@@ -197,7 +217,7 @@ export default function VerseIQPage() {
         "spotify_csv",
         buildCsvFile(
           exportedCatalog.csv,
-          `${exportedCatalog.artistName.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_spotify_catalog.csv`
+          `${slugifyFileName(exportedCatalog.catalogName)}_spotify_catalog.csv`
         )
       );
 
@@ -234,23 +254,23 @@ export default function VerseIQPage() {
     );
   }
 
-  if (!token) {
-    return (
-      <div className="page-shell">
-        <section className="page-card legal-card">
-        <img src="/vlogo3.png" alt="VerseIQ logo" className="page-logo" />
-        <h1>VerseIQ</h1>
-        <p className="app-subtle">Connect Spotify to export a deduplicated ISRC catalog for SoundExchange forensics.</p>
-        {!authorizeUrl ? (
-          <p className="notice-error">
-            Spotify client configuration is missing. Set NEXT_PUBLIC_SPOTIFY_CLIENT_ID.
+  return (
+    <div className="page-shell">
+      <div className="app-header">
+        <div>
+          <img src="/vlogo3.png" alt="VerseIQ logo" className="page-logo" />
+          <h1 className="app-title">Royalty Recovery Workflow</h1>
+          <p className="app-subtle">
+            Scan a Spotify artist or playlist, review ISRC coverage, upload your SoundExchange export, and find the registrations you are still missing.
           </p>
-        ) : (
+        </div>
+        {token ? (
+          <button onClick={disconnectSpotify}>Disconnect Spotify</button>
+        ) : authorizeUrl ? (
           <a
             href={authorizeUrl}
             style={{
               display: "inline-block",
-              marginTop: 12,
               background: "var(--accent)",
               color: "var(--ink)",
               padding: "12px 18px",
@@ -260,57 +280,122 @@ export default function VerseIQPage() {
               boxShadow: "0 10px 28px var(--shadow)",
             }}
           >
-            Connect Spotify
+            Connect Spotify (Optional)
           </a>
-        )}
-        </section>
-      </div>
-    );
-  }
-
-  return (
-    <div className="page-shell">
-      <div className="app-header">
-        <div>
-          <img src="/vlogo3.png" alt="VerseIQ logo" className="page-logo" />
-          <h1 className="app-title">SoundExchange Gap Analysis</h1>
-          <p className="app-subtle">
-            Paste Spotify Artist URL, export the deduplicated catalog, upload SoundExchange CSV, and run a clean ISRC registration gap report.
-          </p>
-        </div>
-        <button onClick={disconnectSpotify}>
-          Disconnect Spotify
-        </button>
+        ) : null}
       </div>
 
       {errorMessage ? <p className="notice-error" style={{ marginBottom: 18 }}>{errorMessage}</p> : null}
 
       <div className="panel-grid">
         <section className="panel-card">
-          <h2>1. Export Spotify Catalog</h2>
-          <p className="panel-copy">Paste a Spotify artist URL or raw artist ID. VerseIQ will export a deduplicated catalog CSV keyed by ISRC.</p>
+          <h2>1. Scan Spotify Source</h2>
+          <p className="panel-copy">Paste a Spotify artist URL, playlist URL, or raw artist ID. Workflow will detect the source type, scan the catalog, and prepare a deduplicated CSV keyed by ISRC.</p>
           <label style={{ display: "block", marginBottom: 10 }}>
-            Spotify Artist URL or ID
+            Spotify Artist URL, Playlist URL, or Artist ID
             <input
-              value={artistInput}
-              onChange={(event) => setArtistInput(event.target.value)}
-              placeholder="https://open.spotify.com/artist/1Xyo4u8uXC1ZmMpatF05PJ"
+              value={catalogInput}
+              onChange={(event) => setCatalogInput(event.target.value)}
+              placeholder="https://open.spotify.com/artist/... or https://open.spotify.com/playlist/..."
               className="text-input"
             />
           </label>
+          {describeInput(catalogInput) ? (
+            <p className="panel-copy" style={{ marginTop: 0, marginBottom: 12 }}>
+              {describeInput(catalogInput)}
+            </p>
+          ) : null}
           <button onClick={exportSpotifyCatalog} disabled={isExportingCatalog}>
-            {isExportingCatalog ? "Exporting Spotify Catalog..." : "Export Spotify Catalog"}
+            {isExportingCatalog ? "Scanning Spotify Catalog..." : "Scan Spotify Catalog"}
           </button>
 
           {exportedCatalog ? (
             <div className="notice-success" style={{ marginTop: 14 }}>
-              <strong>{exportedCatalog.artistName}</strong> exported successfully. {exportedCatalog.uniqueIsrcs} unique Spotify ISRCs ready for comparison.
+              <strong>{exportedCatalog.catalogName}</strong> is ready. Found {exportedCatalog.tracksFound} tracks, {exportedCatalog.tracksWithIsrc} with valid ISRCs, and {exportedCatalog.tracksMissingIsrc} needing metadata review.
             </div>
           ) : null}
         </section>
 
+        {exportedCatalog ? (
+          <section className="panel-card">
+            <h2>2. Review Catalog Preview</h2>
+            <p className="panel-copy">Review what the workflow found before you compare registrations or download the CSV.</p>
+
+            <div className="workflow-summary-grid">
+              <div className="workflow-summary-card">
+                <div className="workflow-summary-label">Source</div>
+                <div className="workflow-summary-value">{exportedCatalog.sourceType === "playlist" ? "Playlist" : "Artist"}</div>
+                <div className="workflow-summary-copy">{exportedCatalog.sourceName}</div>
+              </div>
+              <div className="workflow-summary-card">
+                <div className="workflow-summary-label">Tracks Found</div>
+                <div className="workflow-summary-value">{exportedCatalog.tracksFound}</div>
+                <div className="workflow-summary-copy">Unique Spotify tracks scanned in this source.</div>
+              </div>
+              <div className="workflow-summary-card">
+                <div className="workflow-summary-label">Valid ISRC</div>
+                <div className="workflow-summary-value">{exportedCatalog.tracksWithIsrc}</div>
+                <div className="workflow-summary-copy">Tracks ready for SoundExchange comparison.</div>
+              </div>
+              <div className="workflow-summary-card workflow-summary-card--warn">
+                <div className="workflow-summary-label">Missing ISRC</div>
+                <div className="workflow-summary-value">{exportedCatalog.tracksMissingIsrc}</div>
+                <div className="workflow-summary-copy">Tracks that may need metadata cleanup before recovery.</div>
+              </div>
+            </div>
+
+            <div className="button-row" style={{ marginBottom: 16 }}>
+              <button
+                type="button"
+                onClick={() => downloadCsv(exportedCatalog.csv, `${slugifyFileName(exportedCatalog.catalogName)}_spotify_catalog.csv`)}
+              >
+                Download Spotify CSV
+              </button>
+            </div>
+
+            {exportedCatalog.previewRows.length ? (
+              <div style={{ overflowX: "auto", marginBottom: 18 }}>
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Track</th>
+                      <th>Artist</th>
+                      <th>Album</th>
+                      <th>Release</th>
+                      <th>ISRC</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {exportedCatalog.previewRows.map((row) => (
+                      <tr key={`${row.isrc}-${row.trackName}`}>
+                        <td>{row.trackName}</td>
+                        <td>{row.artistNames}</td>
+                        <td>{row.albumName}</td>
+                        <td>{row.releaseDate || "-"}</td>
+                        <td>{row.isrc || "Missing"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+
+            {exportedCatalog.missingIsrcPreview.length ? (
+              <div className="workflow-warning-block">
+                <h3>Metadata Warnings</h3>
+                <p className="panel-copy">These tracks were found on Spotify without a valid ISRC. They will not appear in the recovery comparison until metadata is fixed.</p>
+                <ul className="workflow-warning-list">
+                  {exportedCatalog.missingIsrcPreview.map((row) => (
+                    <li key={`${row.trackName}-${row.albumName}`}>{row.trackName} - {row.artistNames}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
         <section className="panel-card">
-          <h2>2. Upload SoundExchange CSV</h2>
+          <h2>3. Upload SoundExchange CSV</h2>
           <p className="panel-copy">Upload the SoundExchange export you want to compare against the Spotify catalog.</p>
           <input
             ref={seFileInputRef}
@@ -321,33 +406,26 @@ export default function VerseIQPage() {
         </section>
 
         <section className="panel-card">
-          <h2>3. Run Gap Analysis</h2>
-          <p className="panel-copy">Run the forensic comparison and render the VerseIQ audit card.</p>
+          <h2>4. Compare Registrations</h2>
+          <p className="panel-copy">Run the comparison and see which Spotify tracks are missing from SoundExchange.</p>
           <div className="button-row">
             <button onClick={runGapAnalysis} disabled={isRunningGapAnalysis || !exportedCatalog}>
-              {isRunningGapAnalysis ? "Running Gap Analysis..." : "Run Gap Analysis"}
+              {isRunningGapAnalysis ? "Running Comparison..." : "Find Missing Registrations"}
             </button>
-            {exportedCatalog ? (
-              <button
-                type="button"
-                onClick={() =>
-                  downloadCsv(
-                    exportedCatalog.csv,
-                    `${exportedCatalog.artistName.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_spotify_catalog.csv`
-                  )
-                }
-              >
-                Download Spotify CSV Again
-              </button>
-            ) : null}
           </div>
         </section>
       </div>
 
       {report ? (
         <div style={{ marginTop: 28 }}>
+          <section className="panel-card" style={{ marginBottom: 18 }}>
+            <h2>Recovery Summary</h2>
+            <p className="panel-copy">
+              We found {report.spotifyUniqueIsrc} Spotify ISRCs in <strong>{exportedCatalog?.catalogName || "this catalog"}</strong>. {report.presentInSoundexchange.length} are already registered in SoundExchange, and <strong>{report.missingInSoundexchange.length}</strong> are still missing.
+            </p>
+          </section>
           <SoundexchangeAuditCard
-            artistName={exportedCatalog?.artistName || "Unknown artist"}
+            catalogName={exportedCatalog?.catalogName || "Unknown catalog"}
             report={report}
           />
         </div>

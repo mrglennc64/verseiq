@@ -35,7 +35,7 @@ function CallbackContent() {
           localStorage.setItem("spotify_refresh_token", data.refresh_token);
         }
 
-        setStatusMessage("Connected. Redirecting to dashboard...");
+        setStatusMessage("Connected. Redirecting to workflow...");
         window.location.href = "/verseiq";
       } catch (error) {
         console.error(error);
@@ -59,7 +59,7 @@ function CallbackContent() {
             className="link-text"
             style={{ display: "inline-block", marginTop: 8 }}
           >
-            Return to dashboard
+            Return to workflow
           </a>
         </>
       ) : null}

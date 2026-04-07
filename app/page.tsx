@@ -542,7 +542,7 @@ export default function HomePage() {
           <a href="#features">Features</a>
           <a href="#process">How It Works</a>
           <a href="#audience">For Whom</a>
-          <Link href="/verseiq">Dashboard</Link>
+          <Link href="/verseiq">Workflow</Link>
           <a href="https://perfecthold.online" className="nav-cta" target="_blank" rel="noreferrer">
             Perfect Hold
           </a>

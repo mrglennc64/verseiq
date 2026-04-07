@@ -1,7 +1,7 @@
 import type { GapReport } from "../types/gapReport";
 
 type Props = {
-  artistName?: string;
+  catalogName?: string;
   report: GapReport;
 };
 
@@ -11,13 +11,13 @@ type MetricProps = {
   highlight?: boolean;
 };
 
-export function SoundexchangeAuditCard({ artistName, report }: Props) {
+export function SoundexchangeAuditCard({ catalogName, report }: Props) {
   return (
     <section className="se-audit-card">
       <div className="se-audit-card__header">
         <h2 className="se-audit-card__title">SoundExchange Performer Audit</h2>
         <p className="se-audit-card__subtitle">
-          {artistName || "Unknown artist"} - Rights-Chain Gap Report
+          {catalogName || "Unknown catalog"} - Rights-Chain Gap Report
         </p>
       </div>
 
