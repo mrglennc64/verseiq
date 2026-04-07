@@ -32,3 +32,15 @@ Thumbs.db
 .claude/
 openrouter.txt
 oroute.txt
+
+# generated audit artifacts
+gap_report.txt
+missing_in_soundexchange.csv
+present_in_soundexchange.csv
+se_not_in_spotify.csv
+spotify_catalog.csv
+spotify_catalog_enriched.csv
+spotify_catalog_unresolved.csv
+soundexchange_export.csv
+tmp_soundexchange.csv
+tmp_spotify.csv

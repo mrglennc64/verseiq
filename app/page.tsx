@@ -16,17 +16,17 @@ export default function HomePage() {
 
         :root {
           --bg-primary: #fcfefd;
-          --bg-secondary: #f6fbf9;
-          --bg-tertiary: #e4f2ed;
-          --bg-card: rgba(255, 255, 255, 0.92);
+          --bg-secondary: #f9fcfb;
+          --bg-tertiary: #d8eee6;
+          --bg-card: rgba(255, 255, 255, 0.74);
           --ink: #111413;
           --ink-soft: #57625f;
           --ink-muted: #74817d;
-          --border: #d7e8e2;
-          --border-light: #e6f1ed;
-          --accent: #72b8a7;
-          --accent-soft: #9cd5c7;
-          --accent-glow: rgba(114, 184, 167, 0.12);
+          --border: rgba(116, 188, 169, 0.18);
+          --border-light: rgba(116, 188, 169, 0.14);
+          --accent: #73bca8;
+          --accent-soft: #b6ddd2;
+          --accent-glow: rgba(114, 184, 167, 0.08);
           --ok: #4f8e72;
           --warn: #9c7d42;
           --err: #b55a66;
@@ -38,7 +38,9 @@ export default function HomePage() {
         html { scroll-behavior: smooth; }
         body {
           font-family: var(--font-body);
-          background: var(--bg-primary);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(255, 255, 255, 0.99) 64%, rgba(212, 239, 231, 0.92) 100%),
+            radial-gradient(circle at 50% 100%, rgba(115, 188, 168, 0.18), transparent 38%);
           color: var(--ink);
           line-height: 1.6;
           overflow-x: hidden;
@@ -49,10 +51,8 @@ export default function HomePage() {
           inset: 0;
           pointer-events: none;
           background:
-            linear-gradient(180deg, rgba(255, 255, 255, 0) 55%, rgba(171, 224, 211, 0.42) 100%),
-            linear-gradient(rgba(114, 184, 167, 0.04) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(114, 184, 167, 0.04) 1px, transparent 1px);
-          background-size: 60px 60px;
+            radial-gradient(circle at 50% 100%, rgba(143, 210, 194, 0.3), transparent 34%),
+            linear-gradient(180deg, rgba(255, 255, 255, 0) 58%, rgba(203, 235, 226, 0.52) 100%);
           z-index: 0;
         }
 
@@ -64,9 +64,9 @@ export default function HomePage() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          background: rgba(252, 254, 253, 0.92);
-          border-bottom: 1px solid var(--border-light);
-          backdrop-filter: blur(8px);
+          background: rgba(255, 255, 255, 0.72);
+          border-bottom: 1px solid transparent;
+          backdrop-filter: blur(4px);
         }
 
         .logo {
@@ -76,7 +76,11 @@ export default function HomePage() {
           text-decoration: none;
         }
 
-        .logo-icon { width: 40px; height: 40px; }
+        .logo-icon { width: 46px; height: 46px; }
+        .logo-icon rect {
+          fill: transparent;
+          stroke: transparent;
+        }
         .logo-text {
           font-family: var(--font-display);
           font-size: 22px;
@@ -140,7 +144,7 @@ export default function HomePage() {
           align-items: center;
           gap: 8px;
           padding: 8px 16px;
-          background: var(--bg-secondary);
+          background: rgba(255, 255, 255, 0.7);
           border: 1px solid var(--border);
           border-radius: 20px;
           font-family: var(--font-mono);
@@ -193,11 +197,12 @@ export default function HomePage() {
         .scanner-card {
           background: var(--bg-card);
           border: 1px solid var(--border);
-          border-radius: 16px;
+          border-radius: 20px;
           padding: 24px;
-          box-shadow: 0 22px 48px rgba(77, 145, 130, 0.12);
+          box-shadow: 0 12px 28px rgba(77, 145, 130, 0.08);
           position: relative;
           overflow: hidden;
+          backdrop-filter: blur(8px);
         }
 
         .scanner-card::before {
@@ -206,8 +211,8 @@ export default function HomePage() {
           top: 0;
           left: 0;
           right: 0;
-          height: 3px;
-          background: linear-gradient(90deg, var(--accent), var(--accent-soft));
+          height: 1px;
+          background: rgba(115, 188, 168, 0.32);
         }
 
         .scanner-header {
@@ -261,8 +266,8 @@ export default function HomePage() {
           align-items: center;
           padding: 11px 13px;
           border-radius: 8px;
-          background: #fffdfa;
-          border-left: 3px solid;
+          background: rgba(255, 255, 255, 0.86);
+          border: 1px solid rgba(116, 188, 169, 0.12);
         }
 
         .territory-name { font-size: 13px; font-weight: 500; }
@@ -273,18 +278,18 @@ export default function HomePage() {
           border-radius: 12px;
         }
 
-        .territory.complete { border-color: var(--ok); }
+        .territory.complete { border-left: 3px solid var(--ok); }
         .territory.complete .territory-status { background: rgba(79, 127, 82, 0.12); color: var(--ok); }
-        .territory.warning { border-color: var(--warn); }
+        .territory.warning { border-left: 3px solid var(--warn); }
         .territory.warning .territory-status { background: rgba(159, 106, 47, 0.12); color: var(--warn); }
-        .territory.error { border-color: var(--err); }
+        .territory.error { border-left: 3px solid var(--err); }
         .territory.error .territory-status { background: rgba(154, 61, 51, 0.12); color: var(--err); }
 
         .scanner-insight {
           padding: 14px;
-          border: 1px solid #dcc7a5;
+          border: 1px solid rgba(116, 188, 169, 0.16);
           border-radius: 8px;
-          background: var(--accent-glow);
+          background: rgba(255, 255, 255, 0.72);
         }
 
         .scanner-insight-label {
@@ -336,9 +341,7 @@ export default function HomePage() {
 
         .features,
         .audience {
-          background: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary));
-          border-top: 1px solid var(--border-light);
-          border-bottom: 1px solid var(--border-light);
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.08));
         }
 
         .features-grid,
@@ -353,8 +356,10 @@ export default function HomePage() {
           padding: 32px;
           background: var(--bg-card);
           border: 1px solid var(--border);
-          border-radius: 12px;
+          border-radius: 18px;
           transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+          box-shadow: 0 10px 24px rgba(77, 145, 130, 0.06);
+          backdrop-filter: blur(6px);
         }
 
         .feature-card:hover,
@@ -440,9 +445,9 @@ export default function HomePage() {
         }
 
         .ecosystem-link {
-          background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(230, 245, 239, 0.72));
           border: 1px solid var(--border);
-          border-radius: 16px;
+          border-radius: 20px;
           text-align: center;
           padding: 46px;
         }
@@ -466,8 +471,8 @@ export default function HomePage() {
         }
 
         footer {
-          background: var(--bg-secondary);
-          border-top: 1px solid var(--border-light);
+          background: transparent;
+          border-top: 1px solid rgba(116, 188, 169, 0.08);
           padding: 42px 40px;
           position: relative;
           z-index: 1;
@@ -526,7 +531,6 @@ export default function HomePage() {
       <header>
         <Link href="/" className="logo" aria-label="VerseIQ home">
           <svg className="logo-icon" viewBox="0 0 40 40" fill="none">
-            <rect x="2" y="2" width="36" height="36" rx="8" fill="var(--bg-card)" stroke="var(--accent)" strokeWidth="2" />
             <circle cx="20" cy="20" r="10" stroke="var(--accent)" strokeWidth="2" />
             <circle cx="20" cy="20" r="4" fill="var(--accent)" />
           </svg>
