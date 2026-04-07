@@ -15,21 +15,21 @@ export default function HomePage() {
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-          --bg-primary: #f4eee3;
-          --bg-secondary: #efe5d3;
-          --bg-tertiary: #e6d8bf;
-          --bg-card: #fffaf1;
-          --ink: #14110f;
-          --ink-soft: #4b4136;
-          --ink-muted: #6f6254;
-          --border: #d8c7ab;
-          --border-light: #e4d8c5;
-          --accent: #8f6a37;
-          --accent-soft: #b5884b;
-          --accent-glow: rgba(143, 106, 55, 0.14);
-          --ok: #4f7f52;
-          --warn: #9f6a2f;
-          --err: #9a3d33;
+          --bg-primary: #fcfefd;
+          --bg-secondary: #f6fbf9;
+          --bg-tertiary: #e4f2ed;
+          --bg-card: rgba(255, 255, 255, 0.92);
+          --ink: #111413;
+          --ink-soft: #57625f;
+          --ink-muted: #74817d;
+          --border: #d7e8e2;
+          --border-light: #e6f1ed;
+          --accent: #72b8a7;
+          --accent-soft: #9cd5c7;
+          --accent-glow: rgba(114, 184, 167, 0.12);
+          --ok: #4f8e72;
+          --warn: #9c7d42;
+          --err: #b55a66;
           --font-display: "Space Grotesk", sans-serif;
           --font-body: "Outfit", sans-serif;
           --font-mono: "JetBrains Mono", monospace;
@@ -48,9 +48,10 @@ export default function HomePage() {
           position: fixed;
           inset: 0;
           pointer-events: none;
-          background-image:
-            linear-gradient(rgba(143, 106, 55, 0.05) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(143, 106, 55, 0.05) 1px, transparent 1px);
+          background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0) 55%, rgba(171, 224, 211, 0.42) 100%),
+            linear-gradient(rgba(114, 184, 167, 0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(114, 184, 167, 0.04) 1px, transparent 1px);
           background-size: 60px 60px;
           z-index: 0;
         }
@@ -63,7 +64,7 @@ export default function HomePage() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          background: rgba(244, 238, 227, 0.92);
+          background: rgba(252, 254, 253, 0.92);
           border-bottom: 1px solid var(--border-light);
           backdrop-filter: blur(8px);
         }
@@ -194,7 +195,7 @@ export default function HomePage() {
           border: 1px solid var(--border);
           border-radius: 16px;
           padding: 24px;
-          box-shadow: 0 22px 48px rgba(56, 39, 16, 0.08);
+          box-shadow: 0 22px 48px rgba(77, 145, 130, 0.12);
           position: relative;
           overflow: hidden;
         }
@@ -359,8 +360,8 @@ export default function HomePage() {
         .feature-card:hover,
         .audience-card:hover {
           transform: translateY(-4px);
-          border-color: #c7aa7b;
-          box-shadow: 0 16px 30px rgba(70, 46, 18, 0.08);
+          border-color: #9cd5c7;
+          box-shadow: 0 16px 30px rgba(77, 145, 130, 0.12);
         }
 
         .feature-icon,

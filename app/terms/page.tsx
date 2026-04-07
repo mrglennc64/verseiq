@@ -1,6 +1,8 @@
 export default function TermsPage() {
   return (
-    <main style={{ maxWidth: 860, margin: "0 auto", padding: "40px 24px 64px" }}>
+    <main className="page-shell">
+      <section className="page-card legal-card">
+      <span className="eyebrow">Legal</span>
       <h1>Terms of Use</h1>
       <p>Last updated: April 2026</p>
 
@@ -34,6 +36,7 @@ export default function TermsPage() {
         <br />
         General inquiries: hello@useverseiq.com
       </p>
+      </section>
     </main>
   );
 }

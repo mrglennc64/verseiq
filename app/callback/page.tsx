@@ -47,26 +47,30 @@ function CallbackContent() {
   }, [code]);
 
   return (
-    <div style={{ padding: 40 }}>
+    <div className="page-shell">
+      <section className="page-card legal-card">
+      <span className="eyebrow">Spotify</span>
       <h1>{statusMessage}</h1>
       {errorMessage ? (
         <>
-          <p style={{ color: "#ff6b6b", maxWidth: 700 }}>{errorMessage}</p>
+          <p className="notice-error" style={{ maxWidth: 700 }}>{errorMessage}</p>
           <a
             href="/verseiq"
-            style={{ color: "#9ad0ff", textDecoration: "underline", display: "inline-block", marginTop: 8 }}
+            className="link-text"
+            style={{ display: "inline-block", marginTop: 8 }}
           >
             Return to dashboard
           </a>
         </>
       ) : null}
+      </section>
     </div>
   );
 }
 
 export default function CallbackPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 40 }}><h1>Connecting to Spotify…</h1></div>}>
+    <Suspense fallback={<div className="page-shell"><section className="page-card legal-card"><h1>Connecting to Spotify...</h1></section></div>}>
       <CallbackContent />
     </Suspense>
   );
