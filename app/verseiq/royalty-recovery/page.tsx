@@ -31,6 +31,7 @@ export default function RoyaltyRecoveryPage() {
   const [isComparing, setIsComparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const seFileInputRef = useRef<HTMLInputElement>(null);
+  const manualCatalogFileInputRef = useRef<HTMLInputElement>(null);
 
   async function scanCatalog() {
     const trimmed = catalogInput.trim();
@@ -52,21 +53,29 @@ export default function RoyaltyRecoveryPage() {
       setCatalog(data as ExportedCatalog);
       setReport(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Catalog scan failed.");
+      const msg = err instanceof Error ? err.message : "Catalog scan failed.";
+      if (/forbidden|403/i.test(msg)) {
+        setError(
+          "Spotify scan is currently blocked for this request. You can still run the audit by uploading a catalog CSV and a SoundExchange CSV below."
+        );
+      } else {
+        setError(msg);
+      }
     } finally {
       setIsScanning(false);
     }
   }
 
   async function runComparison() {
-    if (!catalog) {
-      setError("Scan Spotify catalog first.");
-      return;
-    }
-
     const soundexchangeFile = seFileInputRef.current?.files?.[0];
     if (!soundexchangeFile) {
       setError("Upload a SoundExchange CSV before comparison.");
+      return;
+    }
+
+    const manualCatalogFile = manualCatalogFileInputRef.current?.files?.[0];
+    if (!catalog && !manualCatalogFile) {
+      setError("Either scan Spotify catalog first, or upload a catalog CSV manually.");
       return;
     }
 
@@ -76,10 +85,15 @@ export default function RoyaltyRecoveryPage() {
     try {
       const formData = new FormData();
       formData.append("soundexchange_csv", soundexchangeFile);
-      formData.append(
-        "spotify_csv",
-        buildCsvFile(catalog.csv, `${slugifyFileName(catalog.catalogName)}_spotify_catalog.csv`)
-      );
+
+      if (catalog) {
+        formData.append(
+          "spotify_csv",
+          buildCsvFile(catalog.csv, `${slugifyFileName(catalog.catalogName)}_spotify_catalog.csv`)
+        );
+      } else if (manualCatalogFile) {
+        formData.append("spotify_csv", manualCatalogFile);
+      }
 
       const res = await fetch("/api/gap", { method: "POST", body: formData });
       const data = await res.json().catch(() => ({}));
@@ -126,6 +140,33 @@ export default function RoyaltyRecoveryPage() {
           <p className="text-gray-400 text-sm leading-relaxed">
             Export a claim-ready package with missing works, metadata evidence, and actions for recovery.
           </p>
+        </div>
+      </section>
+
+      <section className="max-w-6xl mx-auto px-6 pb-12">
+        <div className="bg-[#0F0F0F] border border-[#222] rounded-2xl p-8">
+          <h3 className="text-2xl font-semibold mb-4">Source Options</h3>
+          <p className="text-gray-400 mb-6">
+            You can run VerseIQ with Spotify automation or without Spotify using manual CSV ingestion.
+          </p>
+
+          <div className="grid md:grid-cols-3 gap-4 text-sm">
+            <div className="bg-[#161616] border border-[#222] rounded-lg p-4">
+              <p className="text-white font-medium">Option A: Spotify Auto Scan</p>
+              <p className="text-gray-400 mt-2">Paste artist URL, playlist URL, or artist ID and scan automatically.</p>
+            </div>
+            <div className="bg-[#161616] border border-[#222] rounded-lg p-4">
+              <p className="text-white font-medium">Option B: Manual Catalog CSV</p>
+              <p className="text-gray-400 mt-2">Upload your own catalog CSV plus SoundExchange CSV to run a rights-chain comparison.</p>
+            </div>
+            <div className="bg-[#161616] border border-[#222] rounded-lg p-4">
+              <p className="text-white font-medium">Option C: SoundExchange First</p>
+              <p className="text-gray-400 mt-2">Use the dedicated SoundExchange workflow for direct gap investigations.</p>
+              <a className="inline-block mt-3 text-gray-200 underline" href="/verseiq/soundexchange-gaps">
+                Open SoundExchange Gaps
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -262,6 +303,40 @@ export default function RoyaltyRecoveryPage() {
                 className="bg-white text-black font-medium px-6 py-3 rounded-lg hover:bg-gray-200 transition disabled:opacity-60"
               >
                 {isComparing ? "Comparing..." : "Find Missing Registrations"}
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {!catalog ? (
+        <section className="max-w-4xl mx-auto px-6 pb-12">
+          <div className="bg-[#0F0F0F] border border-[#222] rounded-2xl p-8">
+            <h3 className="text-xl font-semibold">Manual Rights-Chain Comparison (No Spotify)</h3>
+            <p className="text-gray-400 text-sm mt-1 mb-4">
+              If Spotify scan is unavailable, upload your catalog CSV and SoundExchange CSV to run the same comparison engine.
+            </p>
+
+            <div className="space-y-4">
+              <input
+                ref={manualCatalogFileInputRef}
+                type="file"
+                accept=".csv"
+                className="w-full bg-black border border-[#333] rounded-lg px-4 py-3 text-white"
+              />
+              <input
+                ref={seFileInputRef}
+                type="file"
+                accept=".csv"
+                className="w-full bg-black border border-[#333] rounded-lg px-4 py-3 text-white"
+              />
+              <button
+                type="button"
+                onClick={runComparison}
+                disabled={isComparing}
+                className="bg-white text-black font-medium px-6 py-3 rounded-lg hover:bg-gray-200 transition disabled:opacity-60"
+              >
+                {isComparing ? "Comparing..." : "Run Manual Comparison"}
               </button>
             </div>
           </div>

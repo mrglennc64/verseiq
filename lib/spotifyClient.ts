@@ -47,7 +47,11 @@ async function spotifyGet(path: string, params?: Record<string, string>) {
   });
 
   if (!res.ok) {
-    throw new Error(`Spotify GET ${url.pathname} failed: ${res.status} ${await res.text()}`);
+    const err = new Error(`Spotify GET ${url.pathname} failed: ${res.status} ${await res.text()}`) as any;
+    if (res.status === 429) {
+      err.retryAfter = parseInt(res.headers.get("Retry-After") ?? "5", 10);
+    }
+    throw err;
   }
 
   return res.json();
@@ -123,6 +127,28 @@ export async function getAlbumTracksAll(albumId: string) {
 
 export async function getTrack(trackId: string) {
   return spotifyGet(`/tracks/${trackId}`);
+}
+
+export async function getArtistAlbums(artistId: string) {
+  const items = await getArtistAlbumsAll(artistId);
+  return { items };
+}
+
+export async function getAlbumTracks(albumId: string) {
+  const items = await getAlbumTracksAll(albumId);
+  const ids = items.map((t: any) => t?.id).filter(Boolean);
+  const fullTracks = await getTracksByIds(ids);
+  const fullById = new Map(fullTracks.map((t: any) => [t.id, t]));
+
+  return {
+    items: items.map((t: any) => {
+      const full = fullById.get(t.id);
+      return {
+        ...t,
+        external_ids: full?.external_ids ?? t.external_ids,
+      };
+    }),
+  };
 }
 
 export async function getTracksByIds(trackIds: string[]) {
