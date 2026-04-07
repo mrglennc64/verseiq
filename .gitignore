@@ -26,3 +26,9 @@ Thumbs.db
 
 # IDE
 .vscode/
+
+# local secret/artifact files
+.cache
+.claude/
+openrouter.txt
+oroute.txt
