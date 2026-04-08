@@ -259,9 +259,9 @@ export default function VerseIQPage() {
       <div className="app-header">
         <div>
           <img src="/vlogo3.png" alt="VerseIQ logo" className="page-logo" />
-          <h1 className="app-title">Royalty Recovery Workflow</h1>
+          <h1 className="app-title">Get Paid What You&apos;re Owed</h1>
           <p className="app-subtle">
-            Scan a Spotify artist or playlist, review ISRC coverage, upload your SoundExchange export, and find the registrations you are still missing.
+            Royalty Recovery engine for artists and rights-holders. Detect missing money, find unregistered works, and launch recovery actions in one flow.
           </p>
         </div>
         {token ? (
@@ -287,10 +287,34 @@ export default function VerseIQPage() {
 
       {errorMessage ? <p className="notice-error" style={{ marginBottom: 18 }}>{errorMessage}</p> : null}
 
+      <section className="panel-card" style={{ marginBottom: 20 }}>
+        <h2>You&apos;re Getting Streams, But Not Getting Paid</h2>
+        <p className="panel-copy">
+          We compare your catalog metadata and ISRC footprint against registration records to identify where royalties are likely being left behind.
+        </p>
+        <div className="workflow-summary-grid" style={{ marginTop: 12 }}>
+          <div className="workflow-summary-card">
+            <div className="workflow-summary-label">Step 1</div>
+            <div className="workflow-summary-value">Scan Catalog</div>
+            <div className="workflow-summary-copy">Detect source and normalize track data.</div>
+          </div>
+          <div className="workflow-summary-card">
+            <div className="workflow-summary-label">Step 2</div>
+            <div className="workflow-summary-value">Find Gaps</div>
+            <div className="workflow-summary-copy">Surface missing registrations and ISRC blockers.</div>
+          </div>
+          <div className="workflow-summary-card">
+            <div className="workflow-summary-label">Step 3</div>
+            <div className="workflow-summary-value">Recover Money</div>
+            <div className="workflow-summary-copy">Export evidence and fix rights-chain issues.</div>
+          </div>
+        </div>
+      </section>
+
       <div className="panel-grid">
         <section className="panel-card">
-          <h2>1. Scan Spotify Source</h2>
-          <p className="panel-copy">Paste a Spotify artist URL, playlist URL, or raw artist ID. Workflow will detect the source type, scan the catalog, and prepare a deduplicated CSV keyed by ISRC.</p>
+          <h2>1. Scan For Missing Money</h2>
+          <p className="panel-copy">Paste a Spotify artist URL, playlist URL, or raw artist ID. VerseIQ will scan the source and prepare a deduplicated evidence file keyed by ISRC.</p>
           <label style={{ display: "block", marginBottom: 10 }}>
             Spotify Artist URL, Playlist URL, or Artist ID
             <input
@@ -306,7 +330,7 @@ export default function VerseIQPage() {
             </p>
           ) : null}
           <button onClick={exportSpotifyCatalog} disabled={isExportingCatalog}>
-            {isExportingCatalog ? "Scanning Spotify Catalog..." : "Scan Spotify Catalog"}
+            {isExportingCatalog ? "Scanning Catalog..." : "Start Royalty Recovery Scan"}
           </button>
 
           {exportedCatalog ? (
@@ -318,8 +342,8 @@ export default function VerseIQPage() {
 
         {exportedCatalog ? (
           <section className="panel-card">
-            <h2>2. Review Catalog Preview</h2>
-            <p className="panel-copy">Review what the workflow found before you compare registrations or download the CSV.</p>
+            <h2>2. Review Revenue Evidence</h2>
+            <p className="panel-copy">Validate what was found before comparing registrations or exporting claim support evidence.</p>
 
             <div className="workflow-summary-grid">
               <div className="workflow-summary-card">
@@ -349,7 +373,7 @@ export default function VerseIQPage() {
                 type="button"
                 onClick={() => downloadCsv(exportedCatalog.csv, `${slugifyFileName(exportedCatalog.catalogName)}_spotify_catalog.csv`)}
               >
-                Download Spotify CSV
+                Download Evidence CSV
               </button>
             </div>
 
@@ -382,8 +406,8 @@ export default function VerseIQPage() {
 
             {exportedCatalog.missingIsrcPreview.length ? (
               <div className="workflow-warning-block">
-                <h3>Metadata Warnings</h3>
-                <p className="panel-copy">These tracks were found on Spotify without a valid ISRC. They will not appear in the recovery comparison until metadata is fixed.</p>
+                <h3>Revenue Risk Warnings</h3>
+                <p className="panel-copy">These tracks were found without valid ISRCs. They are harder to match and can reduce payouts until metadata is corrected.</p>
                 <ul className="workflow-warning-list">
                   {exportedCatalog.missingIsrcPreview.map((row) => (
                     <li key={`${row.trackName}-${row.albumName}`}>{row.trackName} - {row.artistNames}</li>
@@ -395,8 +419,8 @@ export default function VerseIQPage() {
         ) : null}
 
         <section className="panel-card">
-          <h2>3. Upload SoundExchange CSV</h2>
-          <p className="panel-copy">Upload the SoundExchange export you want to compare against the Spotify catalog.</p>
+          <h2>3. Upload Registration Data</h2>
+          <p className="panel-copy">Upload your SoundExchange export to detect where tracks appear active but not fully registered.</p>
           <input
             ref={seFileInputRef}
             type="file"
@@ -406,20 +430,41 @@ export default function VerseIQPage() {
         </section>
 
         <section className="panel-card">
-          <h2>4. Compare Registrations</h2>
-          <p className="panel-copy">Run the comparison and see which Spotify tracks are missing from SoundExchange.</p>
+          <h2>4. Reveal Unclaimed Royalties</h2>
+          <p className="panel-copy">Run the comparison to surface tracks likely earning royalties without complete registration coverage.</p>
           <div className="button-row">
             <button onClick={runGapAnalysis} disabled={isRunningGapAnalysis || !exportedCatalog}>
-              {isRunningGapAnalysis ? "Running Comparison..." : "Find Missing Registrations"}
+              {isRunningGapAnalysis ? "Running Comparison..." : "Find Missing Money"}
             </button>
           </div>
         </section>
       </div>
 
+      <section className="panel-card" style={{ marginTop: 20 }}>
+        <h2>Recovery Plans</h2>
+        <div className="workflow-summary-grid">
+          <div className="workflow-summary-card">
+            <div className="workflow-summary-label">Free</div>
+            <div className="workflow-summary-value">$0</div>
+            <div className="workflow-summary-copy">Basic scan and limited issue visibility.</div>
+          </div>
+          <div className="workflow-summary-card">
+            <div className="workflow-summary-label">Pro</div>
+            <div className="workflow-summary-value">$39</div>
+            <div className="workflow-summary-copy">Full report, CSV export, and fix instructions.</div>
+          </div>
+          <div className="workflow-summary-card workflow-summary-card--warn">
+            <div className="workflow-summary-label">Recovery</div>
+            <div className="workflow-summary-value">10-20% fee</div>
+            <div className="workflow-summary-copy">Hands-on registration handling and metadata correction support.</div>
+          </div>
+        </div>
+      </section>
+
       {report ? (
         <div style={{ marginTop: 28 }}>
           <section className="panel-card" style={{ marginBottom: 18 }}>
-            <h2>Recovery Summary</h2>
+            <h2>Missing Money Summary</h2>
             <p className="panel-copy">
               We found {report.spotifyUniqueIsrc} Spotify ISRCs in <strong>{exportedCatalog?.catalogName || "this catalog"}</strong>. {report.presentInSoundexchange.length} are already registered in SoundExchange, and <strong>{report.missingInSoundexchange.length}</strong> are still missing.
             </p>
