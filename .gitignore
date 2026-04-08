@@ -11,6 +11,8 @@ out/
 .env
 .env.local
 .env*.local
+prisma/dev.db
+prisma/dev.db-journal
 
 # build output
 .vercel

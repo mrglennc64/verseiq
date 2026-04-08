@@ -311,6 +311,18 @@ export default function VerseIQPage() {
         </section>
       ) : null}
 
+      <section className="panel-card" style={{ marginBottom: 18 }}>
+        <h2>New Async Scan Engine</h2>
+        <p className="panel-copy" style={{ marginBottom: 10 }}>
+          For long-running artist scans, use the queue-based flow with status polling, retry support, and CSV export after completion.
+        </p>
+        <div className="button-row">
+          <a href="/verseiq/royalty-recovery" style={{ textDecoration: "none" }}>
+            <button type="button">Open Async Royalty Recovery</button>
+          </a>
+        </div>
+      </section>
+
       <section className="panel-card" style={{ marginBottom: 20 }}>
         <h2>You&apos;re Getting Streams, But Not Getting Paid</h2>
         <p className="panel-copy">
