@@ -1,11 +1,12 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 type ConfidenceLevel = "low" | "medium" | "high";
 type SignalTier = "low" | "emerging" | "elevated";
 type AgeBucket = "new" | "developing" | "established" | "legacy";
+type ScanStatus = "pending" | "processing" | "complete" | "failed";
 
 type EnrichedTrack = {
   track_id: string;
@@ -15,13 +16,13 @@ type EnrichedTrack = {
   release_date: string | null;
   popularity?: number;
   age_bucket: AgeBucket;
-  playback_signals: { level: "low" | "medium" | "high"; indicators: string[] };
+  playback_signals: { level: "low" | "medium" | "high"; indicators?: string[] };
   royalty_signal: {
     score: number;
     tier: SignalTier;
     confidence: ConfidenceLevel;
-    reasons: string[];
-    message: string;
+    reasons?: string[];
+    message?: string;
   };
   metadata_flags: {
     missing_isrc: boolean;
@@ -54,6 +55,20 @@ type RecoveryPackage = {
   methodology: { description: string; limitations: string[] };
 };
 
+type ScanStatusResponse = {
+  scanId: string;
+  status: ScanStatus;
+  progress: number;
+  message?: string | null;
+  error?: string | null;
+};
+
+type ScanResultsResponse = {
+  scanId: string;
+  status: "complete";
+  result: RecoveryPackage;
+};
+
 function confidenceCopy(score: number): string {
   if (score >= 81) return "High probability of unclaimed royalties detected";
   if (score >= 61) return "High probability of leakage across registrations";
@@ -80,118 +95,66 @@ function scoreBar(value: number): string {
 }
 
 function RoyaltyRecoveryDashboardContent() {
-  const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const artistId = searchParams.get("artistId") || "";
-  const artistName = searchParams.get("artistName") || "";
+  const scanId = searchParams.get("scanId") || "";
 
-  const [inputArtistId, setInputArtistId] = useState(artistId);
-  const [inputArtistName, setInputArtistName] = useState(artistName);
+  const [status, setStatus] = useState<ScanStatusResponse | null>(null);
   const [data, setData] = useState<RecoveryPackage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setInputArtistId(artistId);
-    setInputArtistName(artistName);
-  }, [artistId, artistName]);
-
-  function runScan() {
-    const nextArtistId = inputArtistId.trim();
-    const nextArtistName = inputArtistName.trim();
-    if (!nextArtistId && !nextArtistName) {
-      setError("Enter artist name or artist ID to run analysis.");
+    if (!scanId) {
+      setError("Missing scanId query parameter.");
+      setLoading(false);
       return;
     }
 
-    const params = new URLSearchParams();
-    if (nextArtistId) params.set("artistId", nextArtistId);
-    if (nextArtistName) params.set("artistName", nextArtistName);
+    let mounted = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-    setError(null);
-    setData(null);
-    setLoading(true);
-    router.push(`${pathname}?${params.toString()}`);
-  }
-
-  function LauncherPanel() {
-    return (
-      <section className="max-w-7xl mx-auto mb-10">
-        <div className="rounded-2xl border border-[#2d2420] bg-[#18130f] p-5 md:p-6">
-          <p className="text-sm text-[#e7d8cb] mb-3">
-            Run analysis with Spotify artist ID, artist name, or both. Artist name enables fallback providers.
-          </p>
-          <div className="grid md:grid-cols-3 gap-3">
-            <input
-              value={inputArtistId}
-              onChange={(e) => setInputArtistId(e.target.value)}
-              placeholder="Spotify artist ID (optional)"
-              className="bg-[#100d0a] border border-[#3a2f29] rounded-lg px-4 py-3 text-white placeholder-[#9f8c80] focus:outline-none focus:border-[#a96f4a]"
-            />
-            <input
-              value={inputArtistName}
-              onChange={(e) => setInputArtistName(e.target.value)}
-              placeholder="Artist name (recommended)"
-              className="bg-[#100d0a] border border-[#3a2f29] rounded-lg px-4 py-3 text-white placeholder-[#9f8c80] focus:outline-none focus:border-[#a96f4a]"
-            />
-            <button
-              type="button"
-              onClick={runScan}
-              className="rounded-lg px-6 py-3 font-semibold bg-[#e08c5a] text-black hover:bg-[#f0a06f] transition"
-            >
-              Run Royalty Recovery Scan
-            </button>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  useEffect(() => {
-    async function load() {
-      if (!artistId && !artistName) {
-        setError("Missing artistId or artistName query parameter.");
-        setLoading(false);
-        return;
-      }
-
+    const load = async () => {
       try {
-        const params = new URLSearchParams();
-        if (artistId) params.set("artistId", artistId);
-        if (artistName) params.set("artistName", artistName);
+        const statusRes = await fetch(`/api/scan/status?scanId=${encodeURIComponent(scanId)}`);
+        const statusJson = await statusRes.json().catch(() => ({}));
+        if (!statusRes.ok) throw new Error(statusJson?.error || "Failed to load scan status.");
+        if (!mounted) return;
 
-        const res = await fetch(`/api/royalty/recovery-package?${params.toString()}`);
-        const text = await res.text();
-        let json: any = null;
+        const nextStatus = statusJson as ScanStatusResponse;
+        setStatus(nextStatus);
 
-        try {
-          json = text ? JSON.parse(text) : null;
-        } catch {
-          json = null;
+        if (nextStatus.status === "complete") {
+          const resultsRes = await fetch(`/api/scan/results?scanId=${encodeURIComponent(scanId)}`);
+          const resultsJson = await resultsRes.json().catch(() => ({}));
+          if (!resultsRes.ok) throw new Error(resultsJson?.error || "Failed to load scan results.");
+          if (!mounted) return;
+          setData((resultsJson as ScanResultsResponse).result);
+          setLoading(false);
+          return;
         }
 
-        if (!res.ok) {
-          const serverMessage =
-            json?.error ||
-            (res.status === 504
-              ? "The analysis timed out. Retry now with artistName to use fallback providers."
-              : `Audit request failed (HTTP ${res.status}).`);
-          setError(serverMessage);
-        } else if (json?.error) {
-          setError(json.error);
-        } else {
-          setData(json as RecoveryPackage);
+        if (nextStatus.status === "failed") {
+          setError(nextStatus.error || nextStatus.message || "Scan failed.");
+          setLoading(false);
+          return;
         }
-      } catch {
-        setError("Failed to load audit results due to a network or gateway error.");
+
+        setLoading(false);
+        timer = setTimeout(load, 2500);
+      } catch (e: any) {
+        if (!mounted) return;
+        setError(e?.message || "Failed to load scan results.");
+        setLoading(false);
       }
-
-      setLoading(false);
-    }
+    };
 
     load();
-  }, [artistId, artistName]);
+
+    return () => {
+      mounted = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [scanId]);
 
   const topTracks = useMemo(() => {
     if (!data) return [];
@@ -203,42 +166,68 @@ function RoyaltyRecoveryDashboardContent() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0a0807] text-white flex items-center justify-center">
-        <p className="text-[#c9b6a7]">Running royalty recovery analysis...</p>
+        <p className="text-[#c9b6a7]">Loading royalty recovery results...</p>
       </div>
     );
   }
 
-  if (error || !data) {
+  if (error) {
     return (
       <div className="min-h-screen bg-[#0a0807] text-white px-6 py-12 md:px-10">
         <header className="max-w-7xl mx-auto mb-8">
-          <h1 className="text-3xl md:text-5xl font-semibold tracking-tight">Royalty Recovery</h1>
+          <h1 className="text-3xl md:text-5xl font-semibold tracking-tight">Royalty Recovery Results</h1>
         </header>
-        <LauncherPanel />
-        <div className="max-w-7xl mx-auto rounded-xl border border-red-700 bg-[#2b1111] px-6 py-4">
+        <div className="max-w-7xl mx-auto rounded-xl border border-red-700 bg-[#2b1111] px-6 py-4 mb-6">
           <p className="text-red-300 font-medium">Error: {error}</p>
+        </div>
+        <div className="max-w-7xl mx-auto rounded-xl border border-[#5b4737] bg-[#17120e] px-6 py-4">
+          <a href="/verseiq/royalty-recovery" className="text-[#f2d8bf] underline">
+            Start a new async scan
+          </a>
         </div>
       </div>
     );
   }
 
-  const { artist, summary } = data;
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-[#0a0807] text-white flex items-center justify-center">
+        <p className="text-[#c9b6a7]">No result available for this scan.</p>
+      </div>
+    );
+  }
+
+  if (status && status.status !== "complete") {
+    return (
+      <div className="min-h-screen bg-[#0a0807] text-white px-6 py-12 md:px-10">
+        <section className="max-w-7xl mx-auto rounded-2xl border border-[#3d3127] bg-[#14100d] p-6">
+          <h1 className="text-3xl md:text-4xl font-semibold mb-3">Royalty Recovery In Progress</h1>
+          <p className="text-[#dac8b8] mb-4">{status.message || "Processing scan..."}</p>
+          <div className="h-2 rounded-full bg-[#2a221c] overflow-hidden">
+            <div className="h-full bg-[#98ffa9]" style={{ width: `${Math.max(2, Math.min(100, status.progress))}%` }} />
+          </div>
+          <p className="text-xs text-[#a58f7d] mt-2">Progress: {status.progress}%</p>
+        </section>
+      </div>
+    );
+  }
+
+  const { artist, summary, methodology } = data;
   const confidenceHeadline = confidenceCopy(summary.royalty_confidence_score);
   const confidenceTone = statusColor(summary.royalty_confidence_score);
 
-  const missingIsrcRatio =
-    summary.total_tracks > 0 ? (summary.missing_isrcs / summary.total_tracks) * 100 : 0;
-  const unregisteredRatio =
-    summary.total_tracks > 0
-      ? (summary.gap_breakdown.missing_from_soundexchange / summary.total_tracks) * 100
-      : 0;
-  const metadataIssueRatio =
-    summary.total_tracks > 0 ? (summary.gap_breakdown.metadata_issues / summary.total_tracks) * 100 : 0;
+  const missingIsrcRatio = summary.total_tracks > 0 ? (summary.missing_isrcs / summary.total_tracks) * 100 : 0;
+  const unregisteredRatio = summary.total_tracks > 0
+    ? (summary.gap_breakdown.missing_from_soundexchange / summary.total_tracks) * 100
+    : 0;
+  const metadataIssueRatio = summary.total_tracks > 0
+    ? (summary.gap_breakdown.metadata_issues / summary.total_tracks) * 100
+    : 0;
 
   return (
     <div className="min-h-screen bg-[#0a0807] text-white px-6 py-10 md:px-10 md:py-12">
       <header className="max-w-7xl mx-auto mb-10 rounded-3xl border border-[#3a2d22] bg-gradient-to-br from-[#1a1410] via-[#221a13] to-[#0d0a08] p-8 md:p-12">
-        <p className="text-xs uppercase tracking-[0.24em] text-[#ceaf97] mb-4">Royalty Recovery</p>
+        <p className="text-xs uppercase tracking-[0.24em] text-[#ceaf97] mb-4">Royalty Recovery Results</p>
         <h1 className="text-4xl md:text-6xl font-semibold leading-tight mb-3">
           You&apos;re Getting Streams - But Not Getting Paid
         </h1>
@@ -258,12 +247,12 @@ function RoyaltyRecoveryDashboardContent() {
             </p>
           </div>
           <div className="space-y-3">
-            <button className="w-full rounded-xl bg-[#88ff9e] text-black font-semibold px-5 py-3 hover:bg-[#adffbc] transition">
-              Unlock Full Recovery Plan
-            </button>
-            <button className="w-full rounded-xl border border-[#5b4737] bg-[#17120e] text-white font-semibold px-5 py-3 hover:bg-[#221910] transition">
-              Fix My Missing Royalties
-            </button>
+            <a href={`/api/scan/export?scanId=${encodeURIComponent(scanId)}`} className="block w-full rounded-xl bg-[#88ff9e] text-black font-semibold px-5 py-3 text-center hover:bg-[#adffbc] transition">
+              Export Full Recovery CSV
+            </a>
+            <a href="/verseiq/royalty-recovery" className="block w-full rounded-xl border border-[#5b4737] bg-[#17120e] text-white font-semibold px-5 py-3 text-center hover:bg-[#221910] transition">
+              Start New Scan
+            </a>
             <div className="rounded-xl border border-[#5b4737] bg-[#17120e] px-4 py-3">
               <p className="text-xs uppercase tracking-widest text-[#b59a84]">Confidence Badge</p>
               <p className={`text-lg font-semibold ${confidenceTone}`}>{riskText(summary.royalty_confidence_score)}</p>
@@ -272,7 +261,10 @@ function RoyaltyRecoveryDashboardContent() {
         </div>
       </header>
 
-      <LauncherPanel />
+      <section className="max-w-7xl mx-auto mb-8 rounded-2xl border border-[#3d3127] bg-[#14100d] p-6">
+        <p className="text-[#d9c7b8] text-base">{summary.insight_summary}</p>
+        <p className="text-xs text-[#9f8c80] mt-3">Generated: {new Date(data.generated_at).toLocaleString()}</p>
+      </section>
 
       <section className="max-w-7xl mx-auto grid lg:grid-cols-3 gap-5 mb-10">
         <div className="rounded-2xl border border-[#3d3127] bg-[#14100d] p-6 lg:col-span-2">
@@ -290,7 +282,6 @@ function RoyaltyRecoveryDashboardContent() {
                 <div className="h-full bg-[#ff6b6b]" style={{ width: scoreBar(missingIsrcRatio) }} />
               </div>
             </div>
-
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-[#e3d0c0]">Unregistered Tracks</span>
@@ -300,7 +291,6 @@ function RoyaltyRecoveryDashboardContent() {
                 <div className="h-full bg-[#ff9f43]" style={{ width: scoreBar(unregisteredRatio) }} />
               </div>
             </div>
-
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-[#e3d0c0]">Metadata Issues</span>
@@ -320,7 +310,7 @@ function RoyaltyRecoveryDashboardContent() {
           <div className="mt-5 space-y-2 text-sm">
             <p className="text-[#e3d0c0]">Registration coverage: <span className="text-white font-medium">{summary.registration_coverage_percent}%</span></p>
             <p className="text-[#e3d0c0]">Integrity score: <span className="text-white font-medium">{summary.metadata_integrity_score}/100</span></p>
-            <p className="text-[#e3d0c0]">Generated: <span className="text-white font-medium">{new Date(data.generated_at).toLocaleString()}</span></p>
+            <p className="text-[#e3d0c0]">Scan ID: <span className="text-white font-medium">{scanId}</span></p>
           </div>
         </div>
       </section>
@@ -403,11 +393,17 @@ function RoyaltyRecoveryDashboardContent() {
 
       <section className="max-w-7xl mx-auto mb-10 rounded-2xl border border-[#3d3127] bg-[#14100d] p-6">
         <h2 className="text-2xl md:text-3xl font-semibold mb-3">How This Score Is Calculated</h2>
-        <ul className="space-y-2 text-[#d9c7b8] text-sm">
+        <ul className="space-y-2 text-[#d9c7b8] text-sm mb-5">
           <li>Based on catalog analysis against registration status and ISRC completeness.</li>
           <li>Weighted confidence model: missing ISRC, registration gaps, playback, and catalog age.</li>
           <li>Identifies probable mismatches likely to suppress payouts.</li>
           <li>Estimated value range is directional and scales with signal strength and catalog maturity.</li>
+        </ul>
+        <p className="text-sm text-[#cdb9aa] mb-2">{methodology.description}</p>
+        <ul className="space-y-1 text-xs text-[#9f8c80]">
+          {methodology.limitations.map((item, index) => (
+            <li key={`${index}-${item}`}>{item}</li>
+          ))}
         </ul>
       </section>
 
@@ -444,14 +440,6 @@ function RoyaltyRecoveryDashboardContent() {
           </div>
         </div>
       </section>
-
-      <section className="max-w-7xl mx-auto mb-20 rounded-3xl border border-[#5d3d2b] bg-gradient-to-r from-[#1d130d] via-[#25170f] to-[#1a120d] p-8 text-center">
-        <h2 className="text-3xl md:text-4xl font-semibold mb-3">Start Recovering My Royalties</h2>
-        <p className="text-[#e8d4c5] mb-5">Stop leaving money on the table. Turn this scan into a completed recovery workflow.</p>
-        <button className="rounded-xl bg-[#98ffa9] text-black font-semibold px-8 py-3 hover:bg-[#b6ffc2] transition">
-          Start Recovering My Royalties
-        </button>
-      </section>
     </div>
   );
 }
@@ -461,7 +449,7 @@ export default function RoyaltyRecoveryDashboard() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-[#0a0807] text-white flex items-center justify-center">
-          <p className="text-[#c9b6a7]">Loading royalty recovery dashboard...</p>
+          <p className="text-[#c9b6a7]">Loading royalty recovery results...</p>
         </div>
       }
     >

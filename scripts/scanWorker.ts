@@ -141,8 +141,37 @@ async function processNextScan() {
 
     const registrationCoverage = analyzeRegistrationCoverage(rawTracks);
     const escrow = estimateEscrow(rawTracks, signalsByTrack, playbackByTrack, ageByTrack);
+    const metadataIssues = enrichedTracks.filter(
+      (t) =>
+        t.metadata_flags.missing_isrc ||
+        t.metadata_flags.missing_release_date ||
+        t.metadata_flags.duplicate_title
+    ).length;
+    const missingFromSoundexchange = Math.max(0, rawTracks.length - registrationCoverage.registeredCount);
+    const confidenceLabel =
+      confidenceScore >= 81
+        ? "ACTIVE REVENUE LOSS"
+        : confidenceScore >= 61
+        ? "High probability"
+        : confidenceScore >= 31
+        ? "Medium leakage"
+        : "Low risk";
+    const valueRangeConfidence: "low" | "medium" | "high" =
+      metadataIntegrity.missingIsrcCount === 0
+        ? "high"
+        : metadataIntegrity.missingIsrcCount < rawTracks.length * 0.3
+        ? "medium"
+        : "low";
+    const insightSummary =
+      confidenceScore >= 61
+        ? "High probability of unclaimed royalties detected from registration and metadata gaps."
+        : confidenceScore >= 31
+        ? "Medium leakage risk detected. Review flagged tracks to prevent missed royalties."
+        : "Low immediate leakage risk based on currently available catalog data.";
 
     const resultJson = {
+      source: "spotify",
+      generated_at: now.toISOString(),
       artist: {
         id: artist.id,
         name: artist.name,
@@ -155,11 +184,19 @@ async function processNextScan() {
         metadata_integrity_score: metadataIntegrity.score,
         registration_coverage_percent: registrationCoverage.coveragePercent,
         royalty_confidence_score: confidenceScore,
+        royalty_confidence_label: confidenceLabel,
         royalty_signal_distribution: { elevated, emerging, low },
+        gap_breakdown: {
+          missing_from_soundexchange: missingFromSoundexchange,
+          metadata_issues: metadataIssues,
+          fully_registered: registrationCoverage.registeredCount,
+        },
         estimated_value_range_usd: {
           low: escrow.estimatedLowUsd,
           high: escrow.estimatedHighUsd,
+          confidence: valueRangeConfidence,
         },
+        insight_summary: insightSummary,
         scan_context: {
           albums_scanned: albums.length,
           tracks_scanned: rawTracks.length,
@@ -167,6 +204,15 @@ async function processNextScan() {
         },
       },
       tracks: enrichedTracks,
+      methodology: {
+        description: "Analysis is based on publicly available metadata and inferred activity signals.",
+        limitations: [
+          "Does not include direct reporting data from rights organizations",
+          "Does not confirm existence of payable royalties",
+          "Estimates are illustrative and not financial statements",
+          "Large catalogs may be analyzed as a bounded partial scan for responsiveness",
+        ],
+      },
     };
 
     await updateScan(pending.id, {
