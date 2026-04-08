@@ -1,6 +1,6 @@
 import { prisma } from "../lib/db";
 import type { RoyaltyTrack } from "../lib/royalty/types";
-import { getArtist, getArtistAlbumsPage, getAlbumTracks } from "../lib/spotifyClient";
+import { getArtist, getArtistAlbums, getAlbumTracks } from "../lib/spotifyClient";
 import { analyzeMetadataIntegrity } from "../lib/royalty/metadataIntegrity";
 import { analyzeRegistrationCoverage } from "../lib/royalty/registrationCoverage";
 import { getPlaybackSignals } from "../lib/royalty/playbackSignals";
@@ -41,7 +41,7 @@ async function processNextScan() {
     const now = new Date();
     const artist = await getArtist(pending.artistId);
 
-    const albumsRes = await getArtistAlbumsPage(pending.artistId, 0, MAX_ALBUMS_PER_SCAN);
+    const albumsRes = await getArtistAlbums(pending.artistId);
     const albums = (albumsRes.items ?? []).slice(0, MAX_ALBUMS_PER_SCAN);
     const rawTracks: RoyaltyTrack[] = [];
     let partialScan = false;
