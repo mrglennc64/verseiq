@@ -46,6 +46,10 @@ type CatalogRow = {
   explicit: boolean;
 };
 
+const MAX_ALBUMS_PER_SCAN = 20;
+const MAX_TRACKS_PER_SCAN = 800;
+const MAX_429_RETRIES = 2;
+
 export class SpotifyExportError extends Error {
   status: number;
 
@@ -63,16 +67,36 @@ function spotifyFetch(url: string, token: string) {
   });
 }
 
-async function spotifyJson(url: string, token: string) {
-  const response = await spotifyFetch(url, token);
-  const data = await response.json().catch(() => ({}));
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  if (!response.ok) {
-    const message = data?.error?.message || data?.details || `Spotify request failed (${response.status})`;
+async function spotifyJson(url: string, token: string) {
+  let attempt = 0;
+
+  while (true) {
+    const response = await spotifyFetch(url, token);
+    const data = await response.json().catch(() => ({}));
+
+    if (response.ok) {
+      return data;
+    }
+
+    if (response.status === 429 && attempt < MAX_429_RETRIES) {
+      const retryAfterSeconds = Math.max(1, Number(response.headers.get("Retry-After") || 2));
+      await wait(retryAfterSeconds * 1000 + attempt * 300);
+      attempt += 1;
+      continue;
+    }
+
+    const message =
+      data?.error?.message ||
+      data?.details ||
+      (response.status === 429
+        ? "Spotify rate limit reached. Try again in a minute or use the non-Spotify recovery path."
+        : `Spotify request failed (${response.status})`);
     throw new SpotifyExportError(message, response.status >= 500 ? 502 : response.status);
   }
-
-  return data;
 }
 
 /**
@@ -192,7 +216,7 @@ async function fetchAllAlbums(artistId: string, token: string) {
 
   let nextUrl: string = typeof firstData?.next === "string" ? firstData.next : "";
   const allPages = [firstData];
-  while (nextUrl) {
+  while (nextUrl && albums.size < MAX_ALBUMS_PER_SCAN) {
     allPages.push(await spotifyJson(nextUrl, token));
     const last = allPages[allPages.length - 1];
     nextUrl = typeof last?.next === "string" ? last.next : "";
@@ -209,7 +233,13 @@ async function fetchAllAlbums(artistId: string, token: string) {
         name: album.name || "",
         release_date: album.release_date || "",
       });
+
+      if (albums.size >= MAX_ALBUMS_PER_SCAN) {
+        break;
+      }
     }
+
+    if (albums.size >= MAX_ALBUMS_PER_SCAN) break;
   }
 
   return Array.from(albums.values());
@@ -342,9 +372,17 @@ async function collectArtistCatalog(artistId: string, token: string): Promise<Co
   const albums = await fetchAllAlbums(artistId, token);
   const tracks = new Map<string, CandidateTrack>();
 
-  for (const album of albums) {
+  for (const album of albums.slice(0, MAX_ALBUMS_PER_SCAN)) {
+    if (tracks.size >= MAX_TRACKS_PER_SCAN) {
+      break;
+    }
+
     const albumTracks = await fetchAlbumTracks(album, token);
     for (const track of albumTracks) {
+      if (tracks.size >= MAX_TRACKS_PER_SCAN) {
+        break;
+      }
+
       if (!isMainOrFeatured(track.artists, artistId)) {
         continue;
       }

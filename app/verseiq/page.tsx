@@ -47,6 +47,7 @@ export default function VerseIQPage() {
   const [exportedCatalog, setExportedCatalog] = useState<ExportedCatalog | null>(null);
   const [report, setReport] = useState<GapReport | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showRateLimitFallback, setShowRateLimitFallback] = useState(false);
   const [isRefreshingToken, setIsRefreshingToken] = useState(true);
   const [isExportingCatalog, setIsExportingCatalog] = useState(false);
   const [isRunningGapAnalysis, setIsRunningGapAnalysis] = useState(false);
@@ -146,6 +147,7 @@ export default function VerseIQPage() {
     setExportedCatalog(null);
     setReport(null);
     setErrorMessage(null);
+    setShowRateLimitFallback(false);
   }
 
   async function exportSpotifyCatalog() {
@@ -156,6 +158,7 @@ export default function VerseIQPage() {
     }
 
     setErrorMessage(null);
+    setShowRateLimitFallback(false);
     setIsExportingCatalog(true);
 
     try {
@@ -179,12 +182,19 @@ export default function VerseIQPage() {
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 429) {
+          setShowRateLimitFallback(true);
+          throw new Error(
+            "Spotify is rate-limiting this scan. Continue with the non-Spotify recovery dashboard using artist name."
+          );
+        }
         throw new Error(data?.details || data?.error || `Catalog export failed (HTTP ${res.status})`);
       }
 
       const nextCatalog = data as ExportedCatalog;
       setExportedCatalog(nextCatalog);
       setReport(null);
+      setShowRateLimitFallback(false);
     } catch (error) {
       console.error(error);
       setErrorMessage(
@@ -286,6 +296,20 @@ export default function VerseIQPage() {
       </div>
 
       {errorMessage ? <p className="notice-error" style={{ marginBottom: 18 }}>{errorMessage}</p> : null}
+
+      {showRateLimitFallback ? (
+        <section className="panel-card" style={{ marginBottom: 18 }}>
+          <h2>Spotify Throttled This Scan</h2>
+          <p className="panel-copy" style={{ marginBottom: 10 }}>
+            Spotify returned 429 for this artist. You can continue right now without Spotify blocking your workflow.
+          </p>
+          <div className="button-row">
+            <a href="/verseiq/royalty-recovery" style={{ textDecoration: "none" }}>
+              <button type="button">Continue In Royalty Recovery</button>
+            </a>
+          </div>
+        </section>
+      ) : null}
 
       <section className="panel-card" style={{ marginBottom: 20 }}>
         <h2>You&apos;re Getting Streams, But Not Getting Paid</h2>
