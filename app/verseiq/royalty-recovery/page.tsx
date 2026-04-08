@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { extractArtistId } from "@/lib/exportSpotifyCatalog";
 
@@ -35,8 +35,29 @@ export default function RoyaltyRecoveryPage() {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
+  const [scanSearch, setScanSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | ScanStatus>("all");
 
   const isRunning = status?.status === "pending" || status?.status === "processing";
+
+  const filteredRecentScans = useMemo(() => {
+    const query = scanSearch.trim().toLowerCase();
+    return recentScans.filter((scan) => {
+      const matchesStatus = statusFilter === "all" || scan.status === statusFilter;
+      if (!matchesStatus) return false;
+      if (!query) return true;
+
+      return (
+        scan.scanId.toLowerCase().includes(query) ||
+        scan.artistId.toLowerCase().includes(query) ||
+        (scan.artistName ?? "").toLowerCase().includes(query)
+      );
+    });
+  }, [recentScans, scanSearch, statusFilter]);
+
+  const latestActiveScan = useMemo(() => {
+    return recentScans.find((scan) => scan.status === "processing" || scan.status === "pending") ?? null;
+  }, [recentScans]);
 
   async function fetchStatus(id: string) {
     const res = await fetch(`/api/scan/status?scanId=${encodeURIComponent(id)}`);
@@ -171,6 +192,29 @@ export default function RoyaltyRecoveryPage() {
         {error ? <p className="text-sm text-red-300 mt-3">{error}</p> : null}
       </section>
 
+        {latestActiveScan && scanId !== latestActiveScan.scanId ? (
+          <section className="max-w-6xl mx-auto rounded-2xl border border-[#4e3b24] bg-[#18120c] p-6 mb-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-widest text-[#d3ae7c] mb-1">Resume Active Scan</p>
+                <h2 className="text-2xl font-semibold text-white">
+                  {latestActiveScan.artistName || latestActiveScan.artistId}
+                </h2>
+                <p className="text-sm text-[#dcc7b2] mt-1">
+                  {latestActiveScan.status.toUpperCase()} · {latestActiveScan.progress}% · {latestActiveScan.message || "Processing scan..."}
+                </p>
+              </div>
+
+              <a
+                href={`/verseiq/royalty-recovery/results?scanId=${encodeURIComponent(latestActiveScan.scanId)}`}
+                className="rounded-xl bg-[#e5a56b] text-black font-semibold px-6 py-3 text-center hover:bg-[#f0b37d] transition"
+              >
+                Resume Latest Scan
+              </a>
+            </div>
+          </section>
+        ) : null}
+
       <section className="max-w-6xl mx-auto rounded-2xl border border-[#30261f] bg-[#14100d] p-6 mb-8">
         <div className="flex items-center justify-between gap-3 mb-4">
           <h2 className="text-2xl font-semibold">Recent Scans</h2>
@@ -183,11 +227,31 @@ export default function RoyaltyRecoveryPage() {
           </button>
         </div>
 
-        {recentScans.length === 0 ? (
+        <div className="grid md:grid-cols-[1fr_220px] gap-3 mb-4">
+          <input
+            value={scanSearch}
+            onChange={(e) => setScanSearch(e.target.value)}
+            placeholder="Search by artist, artist ID, or scan ID"
+            className="bg-[#0d0a08] border border-[#46372d] rounded-xl px-4 py-3 text-white placeholder-[#9d8979] focus:outline-none focus:border-[#d08754]"
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as "all" | ScanStatus)}
+            className="bg-[#0d0a08] border border-[#46372d] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#d08754]"
+          >
+            <option value="all">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="processing">Processing</option>
+            <option value="complete">Complete</option>
+            <option value="failed">Failed</option>
+          </select>
+        </div>
+
+        {filteredRecentScans.length === 0 ? (
           <p className="text-sm text-[#a58f7d]">No scans yet. Start one above.</p>
         ) : (
           <div className="space-y-3">
-            {recentScans.map((scan) => (
+            {filteredRecentScans.map((scan) => (
               <div
                 key={scan.scanId}
                 className="rounded-xl border border-[#3a3028] bg-[#120e0b] px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"

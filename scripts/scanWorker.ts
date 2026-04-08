@@ -8,11 +8,22 @@ import { getTrackAgeBucket } from "../lib/royalty/catalogAge";
 import { getRoyaltySignal } from "../lib/royalty/probabilityEngine";
 import { estimateEscrow } from "../lib/royalty/escrowEstimator";
 
+function readPositiveNumber(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 const POLL_INTERVAL_MS = 3000;
 const MAX_ALBUMS_PER_SCAN = 20;
 const MAX_TRACKS_PER_SCAN = 800;
-const COMPLETE_SCAN_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
-const FAILED_SCAN_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
+const COMPLETE_SCAN_RETENTION_MS =
+  readPositiveNumber("SCAN_COMPLETE_RETENTION_DAYS", 7) * 24 * 60 * 60 * 1000;
+const FAILED_SCAN_RETENTION_MS =
+  readPositiveNumber("SCAN_FAILED_RETENTION_DAYS", 3) * 24 * 60 * 60 * 1000;
+const CLEANUP_INTERVAL_MS =
+  readPositiveNumber("SCAN_CLEANUP_INTERVAL_MINUTES", 60) * 60 * 1000;
 
 let lastCleanupAt = 0;
 
@@ -22,7 +33,7 @@ async function updateScan(scanId: string, data: any) {
 
 async function cleanupExpiredScans() {
   const now = Date.now();
-  if (now - lastCleanupAt < 60 * 60 * 1000) {
+  if (now - lastCleanupAt < CLEANUP_INTERVAL_MS) {
     return;
   }
 
