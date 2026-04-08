@@ -16,6 +16,17 @@ type ScanStatusResponse = {
   updatedAt: string;
 };
 
+type RecentScan = {
+  scanId: string;
+  artistId: string;
+  artistName: string | null;
+  status: ScanStatus;
+  progress: number;
+  message?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export default function RoyaltyRecoveryPage() {
   const router = useRouter();
   const [artistInput, setArtistInput] = useState("");
@@ -23,6 +34,7 @@ export default function RoyaltyRecoveryPage() {
   const [status, setStatus] = useState<ScanStatusResponse | null>(null);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recentScans, setRecentScans] = useState<RecentScan[]>([]);
 
   const isRunning = status?.status === "pending" || status?.status === "processing";
 
@@ -31,6 +43,13 @@ export default function RoyaltyRecoveryPage() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.error || "Failed to load scan status.");
     return data as ScanStatusResponse;
+  }
+
+  async function fetchRecentScans() {
+    const res = await fetch("/api/scan/recent");
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || "Failed to load recent scans.");
+    return (data?.scans ?? []) as RecentScan[];
   }
 
   async function startScan() {
@@ -63,6 +82,8 @@ export default function RoyaltyRecoveryPage() {
       }
 
       setScanId(String(data.scanId));
+      const scans = await fetchRecentScans().catch(() => []);
+      setRecentScans(scans);
     } catch (e: any) {
       setError(e?.message || "Unable to start scan. Please try again.");
     } finally {
@@ -77,6 +98,10 @@ export default function RoyaltyRecoveryPage() {
   }
 
   useEffect(() => {
+    fetchRecentScans().then(setRecentScans).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!scanId) return;
 
     let mounted = true;
@@ -89,12 +114,13 @@ export default function RoyaltyRecoveryPage() {
         setStatus(next);
 
         if (next.status === "complete") {
-          router.push(`/verseiq/royalty-recovery/dashboard?scanId=${encodeURIComponent(scanId)}`);
+          router.push(`/verseiq/royalty-recovery/results?scanId=${encodeURIComponent(scanId)}`);
           return;
         }
 
         if (next.status === "failed") {
           setError(next.error || next.message || "Scan failed.");
+          fetchRecentScans().then(setRecentScans).catch(() => {});
           return;
         }
 
@@ -143,6 +169,61 @@ export default function RoyaltyRecoveryPage() {
 
         {scanId ? <p className="text-sm text-[#d8c6b7] mt-3">Scan ID: {scanId}</p> : null}
         {error ? <p className="text-sm text-red-300 mt-3">{error}</p> : null}
+      </section>
+
+      <section className="max-w-6xl mx-auto rounded-2xl border border-[#30261f] bg-[#14100d] p-6 mb-8">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h2 className="text-2xl font-semibold">Recent Scans</h2>
+          <button
+            type="button"
+            onClick={() => fetchRecentScans().then(setRecentScans).catch(() => {})}
+            className="rounded-lg border border-[#4b3d32] px-4 py-2 text-sm text-[#ead7c6] hover:bg-[#1b1511]"
+          >
+            Refresh
+          </button>
+        </div>
+
+        {recentScans.length === 0 ? (
+          <p className="text-sm text-[#a58f7d]">No scans yet. Start one above.</p>
+        ) : (
+          <div className="space-y-3">
+            {recentScans.map((scan) => (
+              <div
+                key={scan.scanId}
+                className="rounded-xl border border-[#3a3028] bg-[#120e0b] px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+              >
+                <div>
+                  <p className="font-medium text-white">{scan.artistName || scan.artistId}</p>
+                  <p className="text-xs text-[#a58f7d] mt-1">
+                    {scan.status.toUpperCase()} · {scan.progress}% · Updated {new Date(scan.updatedAt).toLocaleString()}
+                  </p>
+                  {scan.message ? <p className="text-sm text-[#d8c6b7] mt-1">{scan.message}</p> : null}
+                </div>
+
+                <div className="flex gap-2">
+                  <a
+                    href={`/verseiq/royalty-recovery/results?scanId=${encodeURIComponent(scan.scanId)}`}
+                    className="rounded-lg bg-[#e18e5c] text-black font-medium px-4 py-2 hover:bg-[#f3a170] transition"
+                  >
+                    Open Results
+                  </a>
+                  {scan.status === "complete" ? (
+                    <a
+                      href={`/api/scan/export?scanId=${encodeURIComponent(scan.scanId)}`}
+                      className="rounded-lg border border-[#5b4737] bg-[#17120e] text-white font-medium px-4 py-2 hover:bg-[#221910] transition"
+                    >
+                      Export
+                    </a>
+                  ) : (
+                    <span className="rounded-lg border border-[#3e342d] bg-[#120e0b] text-[#8f7d70] font-medium px-4 py-2">
+                      Export When Complete
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {status ? (

@@ -11,9 +11,45 @@ import { estimateEscrow } from "../lib/royalty/escrowEstimator";
 const POLL_INTERVAL_MS = 3000;
 const MAX_ALBUMS_PER_SCAN = 20;
 const MAX_TRACKS_PER_SCAN = 800;
+const COMPLETE_SCAN_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const FAILED_SCAN_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
+
+let lastCleanupAt = 0;
 
 async function updateScan(scanId: string, data: any) {
   await prisma.royaltyScan.update({ where: { id: scanId }, data });
+}
+
+async function cleanupExpiredScans() {
+  const now = Date.now();
+  if (now - lastCleanupAt < 60 * 60 * 1000) {
+    return;
+  }
+
+  lastCleanupAt = now;
+
+  const completeBefore = new Date(now - COMPLETE_SCAN_RETENTION_MS);
+  const failedBefore = new Date(now - FAILED_SCAN_RETENTION_MS);
+
+  const deletedComplete = await prisma.royaltyScan.deleteMany({
+    where: {
+      status: "complete",
+      updatedAt: { lt: completeBefore },
+    },
+  });
+
+  const deletedFailed = await prisma.royaltyScan.deleteMany({
+    where: {
+      status: "failed",
+      updatedAt: { lt: failedBefore },
+    },
+  });
+
+  if (deletedComplete.count || deletedFailed.count) {
+    console.log(
+      `Cleaned up ${deletedComplete.count} complete scans and ${deletedFailed.count} failed scans`
+    );
+  }
 }
 
 async function processNextScan() {
@@ -239,6 +275,7 @@ async function processNextScan() {
 async function main() {
   console.log("VerseIQ scan worker started");
   while (true) {
+    await cleanupExpiredScans();
     const handled = await processNextScan();
     if (!handled) {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
