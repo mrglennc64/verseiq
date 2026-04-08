@@ -5,6 +5,7 @@ import type { RoyaltyTrack } from "@/lib/royalty/types";
 import { getPlaybackSignals } from "@/lib/royalty/playbackSignals";
 import { getTrackAgeBucket } from "@/lib/royalty/catalogAge";
 import { getRoyaltySignal } from "@/lib/royalty/probabilityEngine";
+import { estimateEscrow } from "@/lib/royalty/escrowEstimator";
 import { analyzeMetadataIntegrity } from "@/lib/royalty/metadataIntegrity";
 import { analyzeRegistrationCoverage } from "@/lib/royalty/registrationCoverage";
 import { buildAlternativeCatalog } from "@/lib/royalty/alternativeProviders";
@@ -104,11 +105,18 @@ export async function GET(req: NextRequest) {
       }
 
       // Per-track enrichment
+      const signalsByTrack = new Map<string, ReturnType<typeof getRoyaltySignal>>();
+      const playbackByTrack = new Map<string, "low" | "medium" | "high">();
+      const ageByTrack = new Map<string, "new" | "developing" | "established" | "legacy">();
       const enrichedTracks = rawTracks.map((t) => {
         const playbackSignals = getPlaybackSignals(t, now);
         const ageBucket = getTrackAgeBucket(t, now);
         const royaltySignal = getRoyaltySignal(t, playbackSignals, ageBucket);
         const dupCount = titleCounts.get(t.track_name.toLowerCase().trim()) ?? 0;
+
+        signalsByTrack.set(t.track_id, royaltySignal);
+        playbackByTrack.set(t.track_id, playbackSignals.level);
+        ageByTrack.set(t.track_id, ageBucket);
 
         return {
           track_id: t.track_id,
@@ -118,6 +126,7 @@ export async function GET(req: NextRequest) {
           album_name: t.album_name,
           release_date: t.release_date,
           popularity: t.popularity,
+          age_bucket: ageBucket,
           playback_signals: playbackSignals,
           royalty_signal: royaltySignal,
           metadata_flags: {
@@ -133,7 +142,25 @@ export async function GET(req: NextRequest) {
       const emerging = enrichedTracks.filter((t) => t.royalty_signal.tier === "emerging").length;
       const low = enrichedTracks.filter((t) => t.royalty_signal.tier === "low").length;
 
-      // Value range (directional, illustrative)
+      const confidenceScore =
+        enrichedTracks.length > 0
+          ? Math.round(
+              enrichedTracks.reduce((sum, t) => sum + t.royalty_signal.score, 0) /
+                enrichedTracks.length
+            )
+          : 0;
+
+      const confidenceLabel =
+        confidenceScore >= 81
+          ? "ACTIVE REVENUE LOSS"
+          : confidenceScore >= 61
+          ? "High probability"
+          : confidenceScore >= 31
+          ? "Medium leakage"
+          : "Low risk";
+
+      const escrow = estimateEscrow(rawTracks, signalsByTrack, playbackByTrack, ageByTrack);
+
       const valueRangeConfidence: "low" | "medium" | "high" =
         metadataIntegrity.missingIsrcCount === 0
           ? "high"
@@ -141,13 +168,23 @@ export async function GET(req: NextRequest) {
           ? "medium"
           : "low";
 
-      // Insight summary
       const insightSummary =
-        elevated > 0
-          ? `${elevated} track${elevated === 1 ? "" : "s"} show elevated signals that may indicate gaps in rights recognition. Metadata integrity score: ${metadataIntegrity.score}/100.`
-          : emerging > 0
-          ? `${emerging} track${emerging === 1 ? "" : "s"} show emerging signals worth reviewing. Metadata integrity score: ${metadataIntegrity.score}/100.`
-          : `No elevated signals detected. Metadata integrity score: ${metadataIntegrity.score}/100.`;
+        confidenceScore >= 61
+          ? "High probability of unclaimed royalties detected from registration and metadata gaps."
+          : confidenceScore >= 31
+          ? "Medium leakage risk detected. Review flagged tracks to prevent missed royalties."
+          : "Low immediate leakage risk based on currently available catalog data.";
+
+      const missingFromRegistries = Math.max(
+        0,
+        rawTracks.length - Math.round((registrationCoverage.coveragePercent / 100) * rawTracks.length)
+      );
+      const metadataIssues = enrichedTracks.filter(
+        (t) =>
+          t.metadata_flags.missing_isrc ||
+          t.metadata_flags.missing_release_date ||
+          t.metadata_flags.duplicate_title
+      ).length;
 
       return {
         source,
@@ -158,10 +195,17 @@ export async function GET(req: NextRequest) {
           missing_isrcs: metadataIntegrity.missingIsrcCount,
           metadata_integrity_score: metadataIntegrity.score,
           registration_coverage_percent: registrationCoverage.coveragePercent,
+          royalty_confidence_score: confidenceScore,
+          royalty_confidence_label: confidenceLabel,
           royalty_signal_distribution: { elevated, emerging, low },
+          gap_breakdown: {
+            missing_from_soundexchange: missingFromRegistries,
+            metadata_issues: metadataIssues,
+            fully_registered: Math.max(0, rawTracks.length - missingFromRegistries),
+          },
           estimated_value_range_usd: {
-            low: elevated * 50,
-            high: elevated * 200,
+            low: escrow.estimatedLowUsd,
+            high: escrow.estimatedHighUsd,
             confidence: valueRangeConfidence,
           },
           insight_summary: insightSummary,

@@ -18,46 +18,42 @@ export function getRoyaltySignal(
   playback: PlaybackSignals,
   ageBucket: CatalogAgeBucket
 ): RoyaltySignalResult {
-  let score = 0;
   const reasons: string[] = [];
 
-  if (!track.isrc) {
-    score += 10;
-    reasons.push("Track lacks ISRC (may affect identification across systems)");
-  } else {
-    score += 5;
-    reasons.push("Track has ISRC (eligible for cross-system matching)");
-  }
+  const missingISRCRatio = track.isrc ? 0 : 1;
+  const unregisteredRatio = track.registered === true ? 0 : 1;
 
-  if (playback.level === "medium") {
-    score += 20;
-    reasons.push("Moderate playback activity detected");
-  }
+  const playbackScoreByLevel: Record<PlaybackSignalLevel, number> = {
+    low: 0.2,
+    medium: 0.6,
+    high: 1.0,
+  };
+  const ageScoreByBucket: Record<CatalogAgeBucket, number> = {
+    new: 0.2,
+    developing: 0.5,
+    established: 0.8,
+    legacy: 1.0,
+  };
 
-  if (playback.level === "high") {
-    score += 35;
-    reasons.push("Strong playback activity signals");
-  }
+  const weightedScore =
+    0.30 * missingISRCRatio +
+    0.35 * unregisteredRatio +
+    0.25 * playbackScoreByLevel[playback.level] +
+    0.10 * ageScoreByBucket[ageBucket];
 
-  if (track.registered === false) {
-    score += 25;
-    reasons.push("Track not present in provided registration dataset");
-  }
+  const score = Math.round(weightedScore * 100);
 
-  if (track.registered === null || track.registered === undefined) {
-    reasons.push("Registration status unknown");
-  }
-
+  if (!track.isrc) reasons.push("Missing ISRC weakens cross-system matching");
+  if (track.registered !== true) reasons.push("Track appears unregistered in comparison dataset");
+  if (playback.level !== "low") reasons.push("External usage signals detected from streaming activity");
   if (ageBucket === "established" || ageBucket === "legacy") {
-    score += 10;
-    reasons.push("Catalog maturity increases likelihood of external usage");
+    reasons.push("Older catalog windows increase unpaid royalty risk");
   }
-
-  score = Math.min(100, score);
+  if (reasons.length === 0) reasons.push("No major royalty leakage indicators detected");
 
   let tier: RoyaltySignalTier = "low";
-  if (score >= 60) tier = "elevated";
-  else if (score >= 30) tier = "emerging";
+  if (score >= 61) tier = "elevated";
+  else if (score >= 31) tier = "emerging";
 
   let confidence: "low" | "medium" | "high" = "low";
   if (track.isrc && track.registered !== null && track.registered !== undefined) {
@@ -68,10 +64,10 @@ export function getRoyaltySignal(
 
   const message =
     tier === "elevated"
-      ? "This track shows signals consistent with potential royalty gaps."
+      ? "High probability of unclaimed royalties detected."
       : tier === "emerging"
-      ? "Some indicators suggest possible metadata or registration gaps."
-      : "Limited indicators of royalty gaps based on available data.";
+      ? "Medium royalty leakage risk detected."
+      : "Low current leakage risk based on available evidence.";
 
   return { score, tier, confidence, reasons, message };
 }

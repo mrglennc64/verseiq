@@ -1,12 +1,11 @@
 "use client";
 
-import { Suspense } from "react";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { RoyaltyHealthCard } from "../components/RoyaltyHealthCard";
 
 type ConfidenceLevel = "low" | "medium" | "high";
 type SignalTier = "low" | "emerging" | "elevated";
+type AgeBucket = "new" | "developing" | "established" | "legacy";
 
 type EnrichedTrack = {
   track_id: string;
@@ -15,6 +14,7 @@ type EnrichedTrack = {
   album_name: string;
   release_date: string | null;
   popularity?: number;
+  age_bucket: AgeBucket;
   playback_signals: { level: "low" | "medium" | "high"; indicators: string[] };
   royalty_signal: {
     score: number;
@@ -39,7 +39,14 @@ type RecoveryPackage = {
     missing_isrcs: number;
     metadata_integrity_score: number;
     registration_coverage_percent: number;
+    royalty_confidence_score: number;
+    royalty_confidence_label: string;
     royalty_signal_distribution: { elevated: number; emerging: number; low: number };
+    gap_breakdown: {
+      missing_from_soundexchange: number;
+      metadata_issues: number;
+      fully_registered: number;
+    };
     estimated_value_range_usd: { low: number; high: number; confidence: ConfidenceLevel };
     insight_summary: string;
   };
@@ -47,15 +54,40 @@ type RecoveryPackage = {
   methodology: { description: string; limitations: string[] };
 };
 
+function confidenceCopy(score: number): string {
+  if (score >= 81) return "High probability of unclaimed royalties detected";
+  if (score >= 61) return "High probability of leakage across registrations";
+  if (score >= 31) return "Medium leakage risk detected";
+  return "Low current leakage risk";
+}
+
+function statusColor(score: number): string {
+  if (score >= 81) return "text-red-300";
+  if (score >= 61) return "text-orange-300";
+  if (score >= 31) return "text-amber-300";
+  return "text-lime-300";
+}
+
+function riskText(score: number): string {
+  if (score >= 81) return "ACTIVE REVENUE LOSS";
+  if (score >= 61) return "High probability";
+  if (score >= 31) return "At risk";
+  return "Low risk";
+}
+
+function scoreBar(value: number): string {
+  return `${Math.max(6, Math.min(100, value))}%`;
+}
+
 function RoyaltyRecoveryDashboardContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const artistId = searchParams.get("artistId") || "";
   const artistName = searchParams.get("artistName") || "";
+
   const [inputArtistId, setInputArtistId] = useState(artistId);
   const [inputArtistName, setInputArtistName] = useState(artistName);
-
   const [data, setData] = useState<RecoveryPackage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,30 +117,30 @@ function RoyaltyRecoveryDashboardContent() {
 
   function LauncherPanel() {
     return (
-      <section className="max-w-6xl mx-auto mb-10">
-        <div className="bg-[#0d1117] border border-[#30363d] rounded-xl p-5">
-          <p className="text-sm text-gray-300 mb-3">
-            Run with Spotify artist ID, artist name, or both. Artist name enables non-Spotify fallback providers.
+      <section className="max-w-7xl mx-auto mb-10">
+        <div className="rounded-2xl border border-[#2d2420] bg-[#18130f] p-5 md:p-6">
+          <p className="text-sm text-[#e7d8cb] mb-3">
+            Run analysis with Spotify artist ID, artist name, or both. Artist name enables fallback providers.
           </p>
           <div className="grid md:grid-cols-3 gap-3">
             <input
               value={inputArtistId}
               onChange={(e) => setInputArtistId(e.target.value)}
               placeholder="Spotify artist ID (optional)"
-              className="bg-black border border-[#333] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#555]"
+              className="bg-[#100d0a] border border-[#3a2f29] rounded-lg px-4 py-3 text-white placeholder-[#9f8c80] focus:outline-none focus:border-[#a96f4a]"
             />
             <input
               value={inputArtistName}
               onChange={(e) => setInputArtistName(e.target.value)}
               placeholder="Artist name (recommended)"
-              className="bg-black border border-[#333] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-[#555]"
+              className="bg-[#100d0a] border border-[#3a2f29] rounded-lg px-4 py-3 text-white placeholder-[#9f8c80] focus:outline-none focus:border-[#a96f4a]"
             />
             <button
               type="button"
               onClick={runScan}
-              className="bg-white text-black font-medium px-6 py-3 rounded-lg hover:bg-gray-200 transition"
+              className="rounded-lg px-6 py-3 font-semibold bg-[#e08c5a] text-black hover:bg-[#f0a06f] transition"
             >
-              Run Analysis
+              Run Royalty Recovery Scan
             </button>
           </div>
         </div>
@@ -123,6 +155,7 @@ function RoyaltyRecoveryDashboardContent() {
         setLoading(false);
         return;
       }
+
       try {
         const params = new URLSearchParams();
         if (artistId) params.set("artistId", artistId);
@@ -142,7 +175,7 @@ function RoyaltyRecoveryDashboardContent() {
           const serverMessage =
             json?.error ||
             (res.status === 504
-              ? "The audit request timed out. Please retry in a moment."
+              ? "The analysis timed out. Retry now with artistName to use fallback providers."
               : `Audit request failed (HTTP ${res.status}).`);
           setError(serverMessage);
         } else if (json?.error) {
@@ -153,344 +186,271 @@ function RoyaltyRecoveryDashboardContent() {
       } catch {
         setError("Failed to load audit results due to a network or gateway error.");
       }
+
       setLoading(false);
     }
+
     load();
   }, [artistId, artistName]);
 
+  const topTracks = useMemo(() => {
+    if (!data) return [];
+    return [...data.tracks]
+      .sort((a, b) => b.royalty_signal.score - a.royalty_signal.score)
+      .slice(0, 8);
+  }, [data]);
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <p className="text-gray-400">Running metadata analysis...</p>
+      <div className="min-h-screen bg-[#0a0807] text-white flex items-center justify-center">
+        <p className="text-[#c9b6a7]">Running royalty recovery analysis...</p>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] text-white px-8 py-16">
-        <header className="max-w-6xl mx-auto mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight">Royalty Intelligence Dashboard</h1>
+      <div className="min-h-screen bg-[#0a0807] text-white px-6 py-12 md:px-10">
+        <header className="max-w-7xl mx-auto mb-8">
+          <h1 className="text-3xl md:text-5xl font-semibold tracking-tight">Royalty Recovery</h1>
         </header>
         <LauncherPanel />
-        <div className="max-w-6xl mx-auto bg-[#220000] border border-red-700 px-6 py-4 rounded-xl">
-          <p className="text-red-400 font-medium">Error: {error}</p>
+        <div className="max-w-7xl mx-auto rounded-xl border border-red-700 bg-[#2b1111] px-6 py-4">
+          <p className="text-red-300 font-medium">Error: {error}</p>
         </div>
       </div>
     );
   }
 
-  const { artist, summary, tracks, methodology } = data;
-  const flaggedTracks = tracks.filter(
-    (t) =>
-      t.metadata_flags.missing_isrc ||
-      t.metadata_flags.missing_release_date ||
-      t.metadata_flags.duplicate_title
-  );
-  const aboveLowSignal = tracks.filter((t) => t.royalty_signal.tier !== "low").length;
+  const { artist, summary } = data;
+  const confidenceHeadline = confidenceCopy(summary.royalty_confidence_score);
+  const confidenceTone = statusColor(summary.royalty_confidence_score);
+
+  const missingIsrcRatio =
+    summary.total_tracks > 0 ? (summary.missing_isrcs / summary.total_tracks) * 100 : 0;
+  const unregisteredRatio =
+    summary.total_tracks > 0
+      ? (summary.gap_breakdown.missing_from_soundexchange / summary.total_tracks) * 100
+      : 0;
+  const metadataIssueRatio =
+    summary.total_tracks > 0 ? (summary.gap_breakdown.metadata_issues / summary.total_tracks) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white px-8 py-16">
-      <header className="max-w-6xl mx-auto mb-16">
-        <p className="text-xs uppercase tracking-widest text-gray-500 mb-2">
-          Metadata Intelligence Layer
+    <div className="min-h-screen bg-[#0a0807] text-white px-6 py-10 md:px-10 md:py-12">
+      <header className="max-w-7xl mx-auto mb-10 rounded-3xl border border-[#3a2d22] bg-gradient-to-br from-[#1a1410] via-[#221a13] to-[#0d0a08] p-8 md:p-12">
+        <p className="text-xs uppercase tracking-[0.24em] text-[#ceaf97] mb-4">Royalty Recovery</p>
+        <h1 className="text-4xl md:text-6xl font-semibold leading-tight mb-3">
+          You&apos;re Getting Streams - But Not Getting Paid
+        </h1>
+        <p className="text-lg text-[#e7d6c8] max-w-3xl">
+          We found gaps between your catalog and royalty registrations that may leave money unclaimed.
         </p>
-        <h1 className="text-4xl font-semibold tracking-tight">Royalty Intelligence Dashboard</h1>
-        <p className="text-gray-400 mt-2">
-          Artist: <span className="text-white font-medium">{artist.name}</span>
-        </p>
-        <p className="text-gray-500 text-sm mt-1">
-          Analysis generated: {new Date(data.generated_at).toLocaleString()}
-        </p>
+
+        <div className="mt-8 grid lg:grid-cols-3 gap-5 items-end">
+          <div className="lg:col-span-2 rounded-2xl border border-[#523f31] bg-[#120f0d] p-6">
+            <p className="text-sm uppercase tracking-wider text-[#ba9f8c] mb-2">Estimated Unclaimed Royalties</p>
+            <p className="text-4xl md:text-6xl font-semibold text-[#99ffad]">
+              ${summary.estimated_value_range_usd.low.toLocaleString()} - ${summary.estimated_value_range_usd.high.toLocaleString()}
+            </p>
+            <p className={`mt-3 text-lg ${confidenceTone}`}>{confidenceHeadline}</p>
+            <p className="text-sm text-[#ad9686] mt-2">
+              Artist: <span className="text-white font-medium">{artist.name}</span> · Source: {data.source}
+            </p>
+          </div>
+          <div className="space-y-3">
+            <button className="w-full rounded-xl bg-[#88ff9e] text-black font-semibold px-5 py-3 hover:bg-[#adffbc] transition">
+              Unlock Full Recovery Plan
+            </button>
+            <button className="w-full rounded-xl border border-[#5b4737] bg-[#17120e] text-white font-semibold px-5 py-3 hover:bg-[#221910] transition">
+              Fix My Missing Royalties
+            </button>
+            <div className="rounded-xl border border-[#5b4737] bg-[#17120e] px-4 py-3">
+              <p className="text-xs uppercase tracking-widest text-[#b59a84]">Confidence Badge</p>
+              <p className={`text-lg font-semibold ${confidenceTone}`}>{riskText(summary.royalty_confidence_score)}</p>
+            </div>
+          </div>
+        </div>
       </header>
 
       <LauncherPanel />
 
-      {/* Intelligence Summary */}
-      <section className="max-w-6xl mx-auto mb-12">
-        <div className="bg-[#0d1117] border border-[#30363d] rounded-xl p-6">
-          <p className="text-xs uppercase tracking-wider text-gray-500 mb-2">
-            Intelligence Summary
-          </p>
-          <p className="text-white text-lg leading-relaxed">{summary.insight_summary}</p>
-        </div>
-      </section>
+      <section className="max-w-7xl mx-auto grid lg:grid-cols-3 gap-5 mb-10">
+        <div className="rounded-2xl border border-[#3d3127] bg-[#14100d] p-6 lg:col-span-2">
+          <p className="text-xs uppercase tracking-widest text-[#c0a48d] mb-1">Royalty Health</p>
+          <h2 className="text-2xl md:text-3xl font-semibold">Health Score: {summary.royalty_confidence_score}</h2>
+          <p className={`mt-2 text-sm font-medium ${confidenceTone}`}>Status: {riskText(summary.royalty_confidence_score)}</p>
 
-      {/* Health Score + Stats */}
-      <section className="max-w-6xl mx-auto mb-12 grid md:grid-cols-3 gap-6">
-        <RoyaltyHealthCard score={summary.metadata_integrity_score} />
+          <div className="mt-5 space-y-4">
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-[#e3d0c0]">Missing ISRCs</span>
+                <span className="text-[#ff9a9a]">{summary.missing_isrcs}</span>
+              </div>
+              <div className="h-2 rounded-full bg-[#2a221c] overflow-hidden">
+                <div className="h-full bg-[#ff6b6b]" style={{ width: scoreBar(missingIsrcRatio) }} />
+              </div>
+            </div>
 
-        <div className="bg-[#111] border border-[#222] rounded-xl p-6">
-          <p className="text-gray-400 text-sm mb-1">Catalog Overview</p>
-          <p className="text-3xl font-bold text-white">{summary.total_tracks}</p>
-          <p className="text-gray-400 text-sm mt-1">Total tracks</p>
-          <div className="mt-4 space-y-1 text-sm">
-            <p className="text-gray-300">
-              Missing ISRCs:{" "}
-              <span className="text-red-400 font-medium">{summary.missing_isrcs}</span>
-            </p>
-            <p className="text-gray-300">
-              Registration coverage:{" "}
-              <span className="text-white">{summary.registration_coverage_percent}%</span>
-            </p>
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-[#e3d0c0]">Unregistered Tracks</span>
+                <span className="text-[#ffb86b]">{summary.gap_breakdown.missing_from_soundexchange}</span>
+              </div>
+              <div className="h-2 rounded-full bg-[#2a221c] overflow-hidden">
+                <div className="h-full bg-[#ff9f43]" style={{ width: scoreBar(unregisteredRatio) }} />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-[#e3d0c0]">Metadata Issues</span>
+                <span className="text-[#fdd98a]">{summary.gap_breakdown.metadata_issues}</span>
+              </div>
+              <div className="h-2 rounded-full bg-[#2a221c] overflow-hidden">
+                <div className="h-full bg-[#f4c95d]" style={{ width: scoreBar(metadataIssueRatio) }} />
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="bg-[#111] border border-[#222] rounded-xl p-6">
-          <p className="text-gray-400 text-sm mb-1">Signal Distribution</p>
-          <div className="mt-3 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-green-400 font-medium">Elevated</span>
-              <span className="text-white font-bold">
-                {summary.royalty_signal_distribution.elevated}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-yellow-400 font-medium">Emerging</span>
-              <span className="text-white font-bold">
-                {summary.royalty_signal_distribution.emerging}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">Low</span>
-              <span className="text-white font-bold">
-                {summary.royalty_signal_distribution.low}
-              </span>
-            </div>
+        <div className="rounded-2xl border border-[#3d3127] bg-[#14100d] p-6">
+          <p className="text-xs uppercase tracking-widest text-[#c0a48d] mb-2">Snapshot</p>
+          <p className="text-3xl font-semibold">{summary.total_tracks}</p>
+          <p className="text-sm text-[#c3ae9d]">Tracks analyzed</p>
+          <div className="mt-5 space-y-2 text-sm">
+            <p className="text-[#e3d0c0]">Registration coverage: <span className="text-white font-medium">{summary.registration_coverage_percent}%</span></p>
+            <p className="text-[#e3d0c0]">Integrity score: <span className="text-white font-medium">{summary.metadata_integrity_score}/100</span></p>
+            <p className="text-[#e3d0c0]">Generated: <span className="text-white font-medium">{new Date(data.generated_at).toLocaleString()}</span></p>
           </div>
         </div>
       </section>
 
-      {/* Directional Value Estimate */}
-      <section className="max-w-6xl mx-auto mb-12">
-        <h2 className="text-2xl font-semibold mb-4">Directional Value Estimate</h2>
-        <div className="bg-[#111] border border-[#222] rounded-xl p-6">
-          <p className="text-gray-400 text-sm mb-4">
-            Estimated unclaimed royalty value based on catalog activity signals and missing
-            registrations.
-          </p>
-          <div className="flex items-baseline gap-3">
-            <span className="text-green-400 text-4xl font-bold">
-              ${summary.estimated_value_range_usd.low.toLocaleString()}
-            </span>
-            <span className="text-gray-400">–</span>
-            <span className="text-green-300 text-4xl font-bold">
-              ${summary.estimated_value_range_usd.high.toLocaleString()}
-            </span>
-          </div>
-          <p className="text-gray-500 text-xs mt-3">
-            Confidence:{" "}
-            <span className="text-white capitalize">
-              {summary.estimated_value_range_usd.confidence}
-            </span>
-            {" · "}Based on {summary.royalty_signal_distribution.elevated} elevated-signal tracks at
-            $50–$200 per track. Illustrative only — not a financial statement.
-          </p>
-        </div>
-      </section>
-
-      {/* Conversion Message */}
-      <section className="max-w-6xl mx-auto mb-12">
-        <div className="bg-[#0d1117] border border-[#30363d] rounded-xl p-6">
-          <p className="text-white leading-relaxed">
-            You have{" "}
-            <span className="text-red-400 font-semibold">{summary.missing_isrcs}</span> tracks not
-            registered with SoundExchange or equivalent rights organizations, and several show signs
-            of external playback activity. This combination suggests a high likelihood of unclaimed
-            royalties.
-          </p>
-          <p className="text-gray-500 text-sm mt-2">
-            Tracks with signals above low: <span className="text-white">{aboveLowSignal}</span>
-          </p>
-        </div>
-      </section>
-
-      {/* Playback Signals */}
-      <section className="max-w-6xl mx-auto mb-12">
-        <h2 className="text-2xl font-semibold mb-4">Playback Signals</h2>
-        <p className="text-gray-400 mb-4 text-sm">
-          Your catalog shows activity signals across digital platforms. These signals may indicate
-          external usage that generates royalties.
-        </p>
-        <div className="overflow-x-auto border border-[#222] rounded-xl">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-[#111] text-gray-300">
+      <section className="max-w-7xl mx-auto mb-10 rounded-2xl border border-[#3d3127] bg-[#14100d] p-6">
+        <h2 className="text-2xl md:text-3xl font-semibold mb-4">Where You&apos;re Losing Money</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-[#c3ae9d] border-b border-[#33281f]">
               <tr>
-                <th className="px-4 py-3">Track</th>
-                <th className="px-4 py-3">ISRC</th>
-                <th className="px-4 py-3">Signal</th>
+                <th className="text-left py-3">Category</th>
+                <th className="text-right py-3">Count</th>
               </tr>
             </thead>
             <tbody>
-              {tracks.map((track) => {
-                const level = track.playback_signals.level;
-                const color =
-                  level === "high"
-                    ? "text-green-400"
-                    : level === "medium"
-                    ? "text-yellow-400"
-                    : "text-gray-400";
-                return (
-                  <tr key={track.track_id} className="border-t border-[#222]">
-                    <td className="px-4 py-3">{track.track_name}</td>
-                    <td className="px-4 py-3 font-mono text-xs">
-                      {track.isrc ?? <span className="text-red-400">Missing</span>}
-                    </td>
-                    <td className={`px-4 py-3 font-medium capitalize ${color}`}>{level}</td>
-                  </tr>
-                );
-              })}
+              <tr className="border-b border-[#241d17]">
+                <td className="py-3 text-[#ffd0d0]">Missing from SoundExchange</td>
+                <td className="py-3 text-right font-semibold text-[#ff8f8f]">{summary.gap_breakdown.missing_from_soundexchange}</td>
+              </tr>
+              <tr className="border-b border-[#241d17]">
+                <td className="py-3 text-[#ffe4b7]">Metadata issues</td>
+                <td className="py-3 text-right font-semibold text-[#ffc86d]">{summary.gap_breakdown.metadata_issues}</td>
+              </tr>
+              <tr>
+                <td className="py-3 text-[#d2ffd9]">Fully registered</td>
+                <td className="py-3 text-right font-semibold text-[#9cffac]">{summary.gap_breakdown.fully_registered}</td>
+              </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      {/* Royalty Opportunity Signals */}
-      <section className="max-w-6xl mx-auto mb-12">
-        <h2 className="text-2xl font-semibold mb-4">Royalty Opportunity Signals</h2>
-        <p className="text-gray-400 mb-4 text-sm">
-          Signal-based inference of potential gaps in how tracks may be recognized across rights
-          systems.
-        </p>
-        <div className="overflow-x-auto border border-[#222] rounded-xl">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-[#111] text-gray-300">
-              <tr>
-                <th className="px-4 py-3">Track</th>
-                <th className="px-4 py-3">Signal</th>
-                <th className="px-4 py-3">Score</th>
-                <th className="px-4 py-3">Confidence</th>
-                <th className="px-4 py-3">Message</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tracks.map((track) => {
-                const { tier, score, confidence, message } = track.royalty_signal;
-                const tierColor =
-                  tier === "elevated"
-                    ? "text-green-400"
-                    : tier === "emerging"
-                    ? "text-yellow-400"
-                    : "text-gray-400";
-                const confColor =
-                  confidence === "high"
-                    ? "text-green-400"
-                    : confidence === "medium"
-                    ? "text-yellow-400"
-                    : "text-gray-400";
-                return (
-                  <tr key={`signal-${track.track_id}`} className="border-t border-[#222]">
-                    <td className="px-4 py-3">{track.track_name}</td>
-                    <td className={`px-4 py-3 font-medium capitalize ${tierColor}`}>{tier}</td>
-                    <td className="px-4 py-3">{score}</td>
-                    <td className={`px-4 py-3 capitalize ${confColor}`}>{confidence}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs max-w-xs">{message}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+      <section className="max-w-7xl mx-auto mb-10">
+        <h2 className="text-2xl md:text-3xl font-semibold mb-4">Track-Level Opportunities</h2>
+        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {topTracks.map((track) => {
+            const riskColor =
+              track.royalty_signal.tier === "elevated"
+                ? "text-red-300"
+                : track.royalty_signal.tier === "emerging"
+                ? "text-yellow-300"
+                : "text-gray-300";
+            const riskLabel =
+              track.royalty_signal.tier === "elevated"
+                ? "High probability"
+                : track.royalty_signal.tier === "emerging"
+                ? "Medium"
+                : "Low";
+
+            return (
+              <div key={track.track_id} className="rounded-2xl border border-[#33281f] bg-[#14100d] p-5">
+                <p className="font-semibold leading-snug">{track.track_name}</p>
+                <p className={`mt-2 text-sm font-medium ${riskColor}`}>{riskLabel}</p>
+                <p className="mt-2 text-xs text-[#beaa9a]">Likely generating royalties but not fully registered.</p>
+                <p className="mt-3 text-xs text-[#9f8c80]">Score {track.royalty_signal.score} · Playback {track.playback_signals.level}</p>
+              </div>
+            );
+          })}
         </div>
       </section>
 
-      {/* Metadata Flags */}
-      {flaggedTracks.length > 0 && (
-        <section className="max-w-6xl mx-auto mb-12">
-          <h2 className="text-2xl font-semibold mb-4">Metadata Flags</h2>
-          <div className="overflow-x-auto border border-[#222] rounded-xl">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-[#111] text-gray-300">
-                <tr>
-                  <th className="px-4 py-3">Track</th>
-                  <th className="px-4 py-3">Missing ISRC</th>
-                  <th className="px-4 py-3">Missing Date</th>
-                  <th className="px-4 py-3">Duplicate Title</th>
-                </tr>
-              </thead>
-              <tbody>
-                {flaggedTracks.map((track) => (
-                  <tr key={`flags-${track.track_id}`} className="border-t border-[#222]">
-                    <td className="px-4 py-3">{track.track_name}</td>
-                    <td className="px-4 py-3">
-                      {track.metadata_flags.missing_isrc ? (
-                        <span className="text-red-400">Yes</span>
-                      ) : (
-                        <span className="text-gray-600">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {track.metadata_flags.missing_release_date ? (
-                        <span className="text-yellow-400">Yes</span>
-                      ) : (
-                        <span className="text-gray-600">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {track.metadata_flags.duplicate_title ? (
-                        <span className="text-yellow-400">Yes</span>
-                      ) : (
-                        <span className="text-gray-600">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <section className="max-w-7xl mx-auto mb-10 rounded-2xl border border-[#3d3127] bg-[#14100d] p-6">
+        <h2 className="text-2xl md:text-3xl font-semibold mb-3">We Detect External Usage Signals From Your Catalog</h2>
+        <p className="text-[#d9c7b8] mb-4">Our engine looks for track-level activity patterns and catalog maturity that often correlate with unclaimed rights revenue.</p>
+        <div className="grid md:grid-cols-3 gap-4 text-sm">
+          <div className="rounded-xl border border-[#2f251d] bg-[#120e0b] p-4">
+            <p className="text-[#beaa9a]">High Signal</p>
+            <p className="text-2xl font-semibold text-[#8bff9d]">{summary.royalty_signal_distribution.elevated}</p>
           </div>
-        </section>
-      )}
-
-      {/* Methodology */}
-      <section className="max-w-6xl mx-auto mb-12">
-        <h2 className="text-2xl font-semibold mb-4">Methodology</h2>
-        <div className="bg-[#0d1117] border border-[#30363d] rounded-xl p-6">
-          <p className="text-gray-300 mb-4">{methodology.description}</p>
-          <ul className="space-y-2">
-            {methodology.limitations.map((l, i) => (
-              <li key={i} className="text-gray-500 text-sm flex items-start gap-2">
-                <span className="text-gray-600 mt-0.5">–</span>
-                <span>{l}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="rounded-xl border border-[#2f251d] bg-[#120e0b] p-4">
+            <p className="text-[#beaa9a]">Medium Signal</p>
+            <p className="text-2xl font-semibold text-[#ffd77c]">{summary.royalty_signal_distribution.emerging}</p>
+          </div>
+          <div className="rounded-xl border border-[#2f251d] bg-[#120e0b] p-4">
+            <p className="text-[#beaa9a]">Low Signal</p>
+            <p className="text-2xl font-semibold text-[#d7c7ba]">{summary.royalty_signal_distribution.low}</p>
+          </div>
         </div>
       </section>
 
-      {/* Forensic Audit Modules */}
-      <section className="max-w-6xl mx-auto mb-32">
-        <h2 className="text-2xl font-semibold mb-6">Forensic Audit Modules</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[
-            "Missing ISRCs",
-            "Duplicate Entries",
-            "Incorrect Metadata",
-            "Unmatched Royalties",
-            "Label Discrepancies",
-            "Publisher Conflicts",
-            "Artist Name Variations",
-            "Release Date Mismatches",
-            "Territory Errors",
-            "Payment Audit",
-            "Royalty Rate Validation",
-            "Distribution Audit",
-            "Mechanical Rights Audit",
-            "Performance Rights Audit",
-            "Digital Platform Audit",
-            "Physical Sales Audit",
-            "Historical Data Review",
-            "Summary Report Generation",
-          ].map((module) => (
-            <div
-              key={module}
-              className="bg-[#111] border border-[#222] rounded-xl p-6 hover:bg-[#151515] transition"
-            >
-              <h3 className="text-lg font-medium">{module}</h3>
-              <p className="text-gray-400 text-sm mt-2">
-                Automated analysis module. Click to expand (future).
-              </p>
-            </div>
-          ))}
+      <section className="max-w-7xl mx-auto mb-10 rounded-2xl border border-[#3d3127] bg-[#14100d] p-6">
+        <h2 className="text-2xl md:text-3xl font-semibold mb-3">How This Score Is Calculated</h2>
+        <ul className="space-y-2 text-[#d9c7b8] text-sm">
+          <li>Based on catalog analysis against registration status and ISRC completeness.</li>
+          <li>Weighted confidence model: missing ISRC, registration gaps, playback, and catalog age.</li>
+          <li>Identifies probable mismatches likely to suppress payouts.</li>
+          <li>Estimated value range is directional and scales with signal strength and catalog maturity.</li>
+        </ul>
+      </section>
+
+      <section className="max-w-7xl mx-auto mb-14">
+        <h2 className="text-2xl md:text-3xl font-semibold mb-5">Choose Your Recovery Path</h2>
+        <div className="grid md:grid-cols-3 gap-4">
+          <div className="rounded-2xl border border-[#2e2f25] bg-[#11130e] p-5">
+            <p className="text-sm uppercase tracking-wider text-[#b8beaa]">Free</p>
+            <p className="text-3xl font-semibold mt-2">$0</p>
+            <ul className="mt-4 space-y-2 text-sm text-[#d6dcc9]">
+              <li>Basic scan</li>
+              <li>Limited results</li>
+              <li>Top issues only</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-[#5b4a2e] bg-[#1a140c] p-5">
+            <p className="text-sm uppercase tracking-wider text-[#d9be83]">Pro</p>
+            <p className="text-3xl font-semibold mt-2">$39</p>
+            <ul className="mt-4 space-y-2 text-sm text-[#f0ddbc]">
+              <li>Full gap report</li>
+              <li>CSV export</li>
+              <li>Fix instructions</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-[#5b2e2e] bg-[#1c0f0f] p-5">
+            <p className="text-sm uppercase tracking-wider text-[#e8aaaa]">Recovery</p>
+            <p className="text-2xl font-semibold mt-2">10-20% success fee</p>
+            <p className="text-sm text-[#f2c8c8] mt-1">or $99-$299 one-time</p>
+            <ul className="mt-4 space-y-2 text-sm text-[#f0cfcf]">
+              <li>Registration handling</li>
+              <li>Metadata correction</li>
+              <li>Submission support</li>
+            </ul>
+          </div>
         </div>
+      </section>
+
+      <section className="max-w-7xl mx-auto mb-20 rounded-3xl border border-[#5d3d2b] bg-gradient-to-r from-[#1d130d] via-[#25170f] to-[#1a120d] p-8 text-center">
+        <h2 className="text-3xl md:text-4xl font-semibold mb-3">Start Recovering My Royalties</h2>
+        <p className="text-[#e8d4c5] mb-5">Stop leaving money on the table. Turn this scan into a completed recovery workflow.</p>
+        <button className="rounded-xl bg-[#98ffa9] text-black font-semibold px-8 py-3 hover:bg-[#b6ffc2] transition">
+          Start Recovering My Royalties
+        </button>
       </section>
     </div>
   );
@@ -500,8 +460,8 @@ export default function RoyaltyRecoveryDashboard() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-black text-white flex items-center justify-center">
-          <p className="text-gray-400">Loading audit dashboard...</p>
+        <div className="min-h-screen bg-[#0a0807] text-white flex items-center justify-center">
+          <p className="text-[#c9b6a7]">Loading royalty recovery dashboard...</p>
         </div>
       }
     >
