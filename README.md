@@ -131,6 +131,26 @@ curl -X POST http://localhost:3000/api/gaps/analyze \
   }'
 ```
 
+### For CSV Forensics CLI
+```bash
+npm run soundexchange:compare -- \
+  --spotify ./data/samples/soundexchange-compare/spotify_catalog.csv \
+  --soundexchange ./data/samples/soundexchange-compare/soundexchange_catalog.csv \
+  --out ./data/output
+```
+
+This writes four CSV reports:
+- `missing_in_soundexchange.csv`
+- `isrc_mismatches.csv`
+- `duplicates_spotify.csv`
+- `duplicates_soundexchange.csv`
+
+The CLI accepts the expected default columns below, and also tolerates common header variants:
+- Spotify: `track_name`, `isrc`, `album_name`, `artist_name`
+- SoundExchange: `ISRC`, `Title`, `Artist`, `ReleaseTitle`
+
+Track-to-track mismatch comparison uses normalized titles and artist keys, so common suffixes like `feat.`, `Remastered`, `Live`, `Edit`, and artist variations like `The Artist` or `Artist feat. Guest` do not block a match.
+
 ---
 
 ## 💰 Revenue Tiers

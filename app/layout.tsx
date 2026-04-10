@@ -6,10 +6,15 @@ export const metadata = {
   description: "Gap analysis for European artists using Spotify metadata.",
 };
 
+import { VerseIQSupportWidget } from "@/components/VerseIQSupportWidget";
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <VerseIQSupportWidget />
+      </body>
     </html>
   );
 }

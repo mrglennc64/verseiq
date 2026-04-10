@@ -169,6 +169,29 @@ USM4Z2400003,The Long and Winding Road
 - Estimated missing: $57,000–$95,000/year
 - Recovery priority: CRITICAL
 
+### Test 2B: CSV Comparison CLI
+
+**Expected behavior:** Generate a four-file forensic evidence pack from two CSV exports
+
+```bash
+npm run soundexchange:compare -- \
+  --spotify ./data/samples/soundexchange-compare/spotify_catalog.csv \
+  --soundexchange ./data/samples/soundexchange-compare/soundexchange_catalog.csv \
+  --out ./data/output
+```
+
+**Expected output files:**
+- `missing_in_soundexchange.csv`
+- `isrc_mismatches.csv`
+- `duplicates_spotify.csv`
+- `duplicates_soundexchange.csv`
+
+**Matching behavior:**
+- ISRCs are trimmed and uppercased
+- Title/artist mismatch checks are case-insensitive
+- Suffixes like `Remastered`, `Live`, and `feat.` are ignored during title matching
+- Artist variations like `The Artist` and `Artist feat. Guest` are normalized before mismatch checks
+
 ### Test 3: Playlist Input
 
 **Expected behavior:** Extract all tracks from playlist (not just artist)
