@@ -37,6 +37,9 @@ Thumbs.db
 openrouter.txt
 oroute.txt
 
+# generated LOD PDFs and submission artifacts
+storage/
+
 # generated audit artifacts
 gap_report.txt
 missing_in_soundexchange.csv

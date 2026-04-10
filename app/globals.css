@@ -400,3 +400,803 @@ select {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Letter of Direction page ---------- */
+
+.lod-page__header {
+  margin-bottom: 28px;
+}
+
+.lod-page__title {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.lod-page__subtitle {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  max-width: 720px;
+  line-height: 1.5;
+}
+
+.lod-page__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .lod-page__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* LOD generator form */
+
+.lod-form-card {
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(243, 250, 247, 0.78));
+  color: var(--ink);
+  border-radius: 20px;
+  box-shadow: 0 12px 28px var(--shadow);
+  padding: 24px;
+}
+
+.lod-form-card__header {
+  margin-bottom: 20px;
+}
+
+.lod-form-card__title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.lod-form-card__subtitle {
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.lod-form {
+  display: grid;
+  gap: 16px;
+}
+
+.lod-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 600px) {
+  .lod-form__row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lod-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lod-form__label {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.lod-form__input,
+.lod-form__textarea {
+  font: inherit;
+  color: var(--ink);
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(108, 170, 155, 0.35);
+  background: rgba(255, 255, 255, 0.85);
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.lod-form__input:focus,
+.lod-form__textarea:focus {
+  border-color: var(--accent-dark);
+}
+
+.lod-form__textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88rem;
+  resize: vertical;
+}
+
+.lod-form__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.lod-form__submit {
+  font: inherit;
+  font-weight: 600;
+  color: white;
+  background: var(--accent-dark);
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+.lod-form__submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lod-form__error {
+  color: var(--danger);
+  background: rgba(178, 79, 93, 0.08);
+  border: 1px solid rgba(178, 79, 93, 0.2);
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+.lod-form__success {
+  color: var(--ink);
+  background: rgba(108, 170, 155, 0.12);
+  border: 1px solid rgba(108, 170, 155, 0.3);
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  display: grid;
+  gap: 4px;
+}
+
+.lod-form__hash {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  word-break: break-all;
+  color: var(--ink-soft);
+}
+
+/* LOD list */
+
+.lod-list {
+  display: grid;
+  gap: 16px;
+}
+
+.lod-list__empty,
+.lod-list__error {
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px dashed var(--border);
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.lod-list__error {
+  color: var(--danger);
+  border-color: rgba(178, 79, 93, 0.35);
+}
+
+.lod-card {
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(243, 250, 247, 0.78));
+  border-radius: 18px;
+  box-shadow: 0 10px 24px var(--shadow);
+  padding: 20px;
+}
+
+.lod-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.lod-card__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.lod-card__subtitle {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.lod-card__meta {
+  text-align: right;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.lod-card__id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  margin-top: 2px;
+}
+
+.lod-card__body {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.lod-card__row {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 0.88rem;
+}
+
+.lod-card__label {
+  width: 70px;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.lod-card__value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.lod-card__value--hash {
+  color: var(--ink-soft);
+}
+
+.lod-card__submissions {
+  border-top: 1px solid rgba(108, 170, 155, 0.18);
+  padding-top: 14px;
+}
+
+.lod-card__section-title {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.lod-card__platforms {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 600px) {
+  .lod-card__platforms {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lod-platform {
+  border: 1px solid rgba(108, 170, 155, 0.22);
+  background: var(--surface-mint);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lod-platform__name {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.lod-platform__status {
+  font-size: 0.8rem;
+}
+
+.lod-platform__status--ok {
+  color: var(--accent-dark);
+  font-weight: 600;
+}
+
+.lod-platform__button {
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-dark);
+  background: transparent;
+  color: var(--accent-dark);
+  cursor: pointer;
+}
+
+.lod-platform__button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lod-card__history {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 0.82rem;
+}
+
+.lod-card__history-item {
+  display: flex;
+  gap: 10px;
+  color: var(--ink-soft);
+}
+
+.lod-card__history-platform {
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--accent-dark);
+}
+
+.lod-card__history-note {
+  font-style: italic;
+}
+
+/* ---------- Catalog page ---------- */
+
+.catalog-page__header {
+  margin-bottom: 24px;
+}
+
+.catalog-page__title {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.catalog-page__subtitle {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  max-width: 720px;
+  line-height: 1.5;
+}
+
+.catalog-page__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .catalog-page__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.catalog-panel {
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(243, 250, 247, 0.78));
+  border-radius: 18px;
+  box-shadow: 0 10px 24px var(--shadow);
+  padding: 20px;
+}
+
+.catalog-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 14px;
+}
+
+.catalog-panel__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.catalog-panel__total {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.catalog-panel__empty {
+  padding: 14px;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+}
+
+.catalog-panel__error {
+  margin-bottom: 12px;
+  color: var(--danger);
+  background: rgba(178, 79, 93, 0.08);
+  border: 1px solid rgba(178, 79, 93, 0.2);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+.catalog-panel__list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.catalog-form {
+  display: grid;
+  gap: 8px;
+}
+
+.catalog-form--inline {
+  grid-template-columns: 1fr;
+}
+
+.catalog-form__input {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(108, 170, 155, 0.35);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+  outline: none;
+}
+
+.catalog-form__input:focus {
+  border-color: var(--accent-dark);
+}
+
+.catalog-form__submit {
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: white;
+  background: var(--accent-dark);
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.catalog-form__submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.catalog-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(108, 170, 155, 0.22);
+  background: var(--surface-mint);
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.catalog-row:hover {
+  border-color: var(--accent-dark);
+}
+
+.catalog-row--selected {
+  border-color: var(--accent-dark);
+  background: rgba(108, 170, 155, 0.18);
+}
+
+.catalog-row--static {
+  cursor: default;
+}
+
+.catalog-row--static:hover {
+  border-color: rgba(108, 170, 155, 0.22);
+}
+
+.catalog-row__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.catalog-row__title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.catalog-row__subtitle {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.catalog-row__subtitle code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.catalog-row__meta {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.catalog-row__warning {
+  margin-top: 4px;
+  font-size: 0.72rem;
+  color: var(--danger);
+}
+
+.catalog-artist-row {
+  display: grid;
+  gap: 6px;
+}
+
+.catalog-form__link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--accent-dark);
+  cursor: pointer;
+  text-decoration: underline;
+  text-align: left;
+}
+
+.catalog-edit {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(108, 170, 155, 0.25);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.catalog-edit__actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* ---------- Catalog health ---------- */
+
+.health-report {
+  display: grid;
+  gap: 16px;
+}
+
+.health-card {
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(243, 250, 247, 0.78));
+  border-radius: 18px;
+  box-shadow: 0 10px 24px var(--shadow);
+  padding: 20px;
+}
+
+.health-card--summary {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.health-card--loading,
+.health-card--error,
+.health-card--ok {
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.health-card--error {
+  color: var(--danger);
+}
+
+.health-card--ok {
+  color: var(--accent-dark);
+  font-weight: 600;
+}
+
+.health-score {
+  font-size: 3rem;
+  font-weight: 700;
+  min-width: 90px;
+  text-align: center;
+  border-radius: 14px;
+  padding: 12px 16px;
+  border: 1px solid rgba(108, 170, 155, 0.25);
+}
+
+.health-score--good {
+  color: var(--accent-dark);
+  background: rgba(108, 170, 155, 0.15);
+}
+
+.health-score--ok {
+  color: #b07a1c;
+  background: rgba(207, 167, 61, 0.15);
+  border-color: rgba(207, 167, 61, 0.3);
+}
+
+.health-score--bad {
+  color: var(--danger);
+  background: rgba(178, 79, 93, 0.12);
+  border-color: rgba(178, 79, 93, 0.3);
+}
+
+.health-summary {
+  flex: 1;
+  display: grid;
+  gap: 6px;
+}
+
+.health-summary__title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.health-summary__meta {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.health-summary__counts {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.health-pill {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.health-pill--error {
+  color: var(--danger);
+  background: rgba(178, 79, 93, 0.12);
+  border: 1px solid rgba(178, 79, 93, 0.3);
+}
+
+.health-pill--warning {
+  color: #b07a1c;
+  background: rgba(207, 167, 61, 0.15);
+  border: 1px solid rgba(207, 167, 61, 0.3);
+}
+
+.health-refresh {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-dark);
+  background: transparent;
+  color: var(--accent-dark);
+  cursor: pointer;
+}
+
+.health-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.health-card__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.health-issue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.health-issue {
+  font-size: 0.88rem;
+  color: var(--ink);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(126, 143, 181, 0.06);
+  border: 1px solid rgba(126, 143, 181, 0.18);
+}
+
+/* ---------- LOD form: extra bits added in this slice ---------- */
+
+.lod-form__hint {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.lod-form__hint a {
+  color: var(--accent-dark);
+}
+
+.lod-form__recordings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.lod-form__recordings-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.lod-form__link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.8rem;
+  color: var(--accent-dark);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.lod-form__recordings {
+  display: grid;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid rgba(108, 170, 155, 0.25);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.lod-form__empty {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  text-align: center;
+  padding: 10px;
+}
+
+.lod-form__empty a {
+  color: var(--accent-dark);
+}
+
+.lod-form__recording {
+  display: grid;
+  grid-template-columns: auto 130px 1fr;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.85rem;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.lod-form__recording:hover {
+  background: rgba(108, 170, 155, 0.1);
+}
+
+.lod-form__recording-isrc {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent-dark);
+}
+
+.lod-form__recording-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lod-form__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}

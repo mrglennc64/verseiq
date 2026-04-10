@@ -18,3 +18,103 @@ model RoyaltyScan {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
+
+model Tenant {
+  id        String          @id @default(cuid())
+  slug      String          @unique
+  name      String
+  createdAt DateTime        @default(now())
+  settings  TenantSettings?
+}
+
+model TenantSettings {
+  id                   String   @id @default(cuid())
+  tenantId             String   @unique
+  tenant               Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  defaultRepName       String?
+  defaultRepEntity     String?
+  defaultFeePercent    Float?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model Artist {
+  id              String      @id @default(cuid())
+  tenantId        String      @default("default")
+  legalName       String
+  stageName       String?
+  address         String?
+  email           String?
+  soundexchangeId String?
+  mlcId           String?
+  proAffiliation  String?
+  createdAt       DateTime    @default(now())
+  recordings      Recording[]
+
+  @@index([tenantId])
+}
+
+model Recording {
+  id          String   @id @default(cuid())
+  tenantId    String   @default("default")
+  artistId    String
+  artist      Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  isrc        String
+  title       String
+  releaseDate DateTime?
+  label       String?
+  upc         String?
+  createdAt   DateTime @default(now())
+  splits      Split[]
+
+  @@index([tenantId])
+  @@index([artistId])
+  @@unique([tenantId, isrc])
+}
+
+model Split {
+  id              String    @id @default(cuid())
+  tenantId        String    @default("default")
+  recordingId     String
+  recording       Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+  participantName String
+  role            String
+  percentage      Float
+  createdAt       DateTime  @default(now())
+
+  @@index([tenantId])
+  @@index([recordingId])
+}
+
+model Lod {
+  id                    String       @id @default(cuid())
+  tenantId              String       @default("default")
+  artistLegalName       String
+  artistAddress         String
+  artistEmail           String
+  representativeName    String
+  representativeEntity  String
+  feePercent            Float
+  isrcs                 Json
+  pdfPath               String
+  pdfHash               String
+  createdAt             DateTime     @default(now())
+  submissions           Submission[]
+
+  @@index([tenantId])
+}
+
+model Submission {
+  id          String   @id @default(cuid())
+  tenantId    String   @default("default")
+  lodId       String?
+  lod         Lod?     @relation(fields: [lodId], references: [id])
+  platform    String   // "soundexchange" | "mlc" | "pro"
+  packetPath  String
+  status      String   @default("submitted")
+  note        String?
+  submittedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+}
