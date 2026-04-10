@@ -55,17 +55,18 @@ model Artist {
 }
 
 model Recording {
-  id          String   @id @default(cuid())
-  tenantId    String   @default("default")
-  artistId    String
-  artist      Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  isrc        String
-  title       String
-  releaseDate DateTime?
-  label       String?
-  upc         String?
-  createdAt   DateTime @default(now())
-  splits      Split[]
+  id             String          @id @default(cuid())
+  tenantId       String          @default("default")
+  artistId       String
+  artist         Artist          @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  isrc           String
+  title          String
+  releaseDate    DateTime?
+  label          String?
+  upc            String?
+  createdAt      DateTime        @default(now())
+  splits         Split[]
+  statementLines StatementLine[]
 
   @@index([tenantId])
   @@index([artistId])
@@ -84,6 +85,46 @@ model Split {
 
   @@index([tenantId])
   @@index([recordingId])
+}
+
+model Statement {
+  id             String          @id @default(cuid())
+  tenantId       String          @default("default")
+  sourcePlatform String          // "soundexchange" | "mlc" | "distrokid" | "generic" | ...
+  sourceFilename String
+  uploadedAt     DateTime        @default(now())
+  totalRows      Int             @default(0)
+  matchedRows    Int             @default(0)
+  unmatchedRows  Int             @default(0)
+  totalAmount    Float           @default(0)
+  unmatchedAmount Float          @default(0)
+  currency       String          @default("USD")
+  notes          String?
+  lines          StatementLine[]
+
+  @@index([tenantId])
+  @@index([sourcePlatform])
+}
+
+model StatementLine {
+  id          String    @id @default(cuid())
+  tenantId    String    @default("default")
+  statementId String
+  statement   Statement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  recordingId String?
+  recording   Recording? @relation(fields: [recordingId], references: [id])
+  rawIsrc     String?
+  rawTitle    String?
+  rawArtist   String?
+  rawPeriod   String?
+  amount      Float     @default(0)
+  matched     Boolean   @default(false)
+  rawRow      Json
+
+  @@index([tenantId])
+  @@index([statementId])
+  @@index([recordingId])
+  @@index([matched])
 }
 
 model Lod {

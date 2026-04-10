@@ -35,6 +35,11 @@ export function RecordingPanel({ artistId, selectedRecordingId, onSelect }: Prop
   const [title, setTitle] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const [showImport, setShowImport] = useState(false);
+  const [spotifyArtist, setSpotifyArtist] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     if (!artistId) {
       setRecordings([]);
@@ -57,6 +62,35 @@ export function RecordingPanel({ artistId, selectedRecordingId, onSelect }: Prop
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleImport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!artistId) return;
+    setImporting(true);
+    setError(null);
+    setImportResult(null);
+    try {
+      const res = await fetch("/api/recordings/import-spotify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artistId, spotifyArtist }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Import failed");
+      const name = data.spotifyArtistName ? ` for ${data.spotifyArtistName}` : "";
+      setImportResult(
+        `Imported ${data.created} new ISRCs${name} ` +
+          `(${data.albumsScanned} albums scanned, ` +
+          `${data.isrcsFound} ISRCs found, ${data.skippedExisting} already in catalog).`,
+      );
+      setSpotifyArtist("");
+      await load();
+    } catch (err: any) {
+      setError(err?.message ?? "Import failed");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,7 +131,39 @@ export function RecordingPanel({ artistId, selectedRecordingId, onSelect }: Prop
     <section className="catalog-panel">
       <header className="catalog-panel__header">
         <h2 className="catalog-panel__title">Recordings</h2>
+        <button
+          type="button"
+          className="catalog-form__link"
+          onClick={() => {
+            setShowImport((v) => !v);
+            setImportResult(null);
+          }}
+        >
+          {showImport ? "Cancel import" : "Import from Spotify"}
+        </button>
       </header>
+
+      {showImport && (
+        <form className="catalog-form" onSubmit={handleImport}>
+          <input
+            className="catalog-form__input"
+            placeholder="Spotify artist URL or ID"
+            value={spotifyArtist}
+            onChange={(e) => setSpotifyArtist(e.target.value)}
+            required
+          />
+          <button
+            type="submit"
+            className="catalog-form__submit"
+            disabled={importing || !spotifyArtist.trim()}
+          >
+            {importing ? "Importing… (may take a minute)" : "Fetch all ISRCs"}
+          </button>
+          {importResult && (
+            <div className="catalog-panel__success">{importResult}</div>
+          )}
+        </form>
+      )}
 
       <form className="catalog-form catalog-form--inline" onSubmit={handleSubmit}>
         <input

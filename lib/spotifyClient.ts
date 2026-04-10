@@ -29,6 +29,12 @@ async function spotifyGetWithLimitFallback(path: string, offset = 0) {
   throw lastErr ?? new Error("Spotify request failed for all fallback limits");
 }
 
+// Max seconds we're willing to wait on a 429 before giving up. Spotify can
+// return Retry-After values in the minutes/hours range when the app is in a
+// penalty box — we don't want a request hanging that long.
+const MAX_RETRY_WAIT_SEC = 30;
+const MAX_RETRY_ATTEMPTS = 3;
+
 async function spotifyGet(path: string, params?: Record<string, string>) {
   const token = await getSpotifyToken();
   const url = new URL(path.startsWith("http") ? path : SPOTIFY_API + path);
@@ -41,20 +47,44 @@ async function spotifyGet(path: string, params?: Record<string, string>) {
     console.log("[SPOTIFY GET]", url.toString());
   }
 
-  const res = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
+  for (let attempt = 0; attempt < MAX_RETRY_ATTEMPTS; attempt++) {
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
 
-  if (!res.ok) {
-    const err = new Error(`Spotify GET ${url.pathname} failed: ${res.status} ${await res.text()}`) as any;
+    if (res.ok) return res.json();
+
     if (res.status === 429) {
-      err.retryAfter = parseInt(res.headers.get("Retry-After") ?? "5", 10);
+      const retryAfter = parseInt(res.headers.get("Retry-After") ?? "5", 10);
+      const isLastAttempt = attempt === MAX_RETRY_ATTEMPTS - 1;
+      if (isLastAttempt || retryAfter > MAX_RETRY_WAIT_SEC) {
+        const err = new Error(
+          `Spotify GET ${url.pathname} rate limited (429). Retry-After: ${retryAfter}s. ` +
+            `Spotify has throttled this app — wait ${retryAfter}s before trying again.`,
+        ) as any;
+        err.retryAfter = retryAfter;
+        err.status = 429;
+        throw err;
+      }
+      if (DEBUG) {
+        console.warn(
+          `[SPOTIFY GET] 429, waiting ${retryAfter}s before retry (attempt ${attempt + 1}/${MAX_RETRY_ATTEMPTS})`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, retryAfter * 1000));
+      continue;
     }
+
+    // Any other non-OK status: fail immediately
+    const err = new Error(
+      `Spotify GET ${url.pathname} failed: ${res.status} ${await res.text()}`,
+    ) as any;
+    err.status = res.status;
     throw err;
   }
 
-  return res.json();
+  throw new Error(`Spotify GET ${url.pathname} exhausted ${MAX_RETRY_ATTEMPTS} retries`);
 }
 
 export async function getArtist(artistId: string) {
