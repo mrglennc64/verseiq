@@ -1,13 +1,15 @@
-/* Label Dashboard — scoped CSS module. Palette deliberately mirrors the
-   artist hub dashboard (dark slate) but uses a blue avatar gradient so
-   label / artist / manager surfaces are visually distinct. */
+/* Label Dashboard — light palette matching the VerseIQ index page.
+   Mint gradient background, translucent white cards, teal accent. */
 
 .page {
   min-height: 100vh;
-  background: #020617;
-  color: #e5e7eb;
   padding: 24px;
+  color: #111413;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(255, 255, 255, 0.99) 64%, rgba(212, 239, 231, 0.92) 100%),
+    radial-gradient(circle at 50% 100%, rgba(115, 188, 168, 0.18), transparent 38%);
+  background-attachment: fixed;
 }
 
 .dashboard {
@@ -19,10 +21,12 @@
 }
 
 .card {
-  background: #0b1222;
-  border: 1px solid #1f2937;
-  border-radius: 16px;
-  padding: 20px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(116, 188, 169, 0.18);
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 12px 28px rgba(77, 145, 130, 0.06);
+  backdrop-filter: blur(6px);
 }
 
 .labelHeader {
@@ -36,22 +40,23 @@
   width: 52px;
   height: 52px;
   border-radius: 999px;
-  background: radial-gradient(circle at 30% 20%, #3b82f6, #0f172a);
+  background: radial-gradient(circle at 30% 20%, #73bca8, #b6ddd2);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  color: #e5e7eb;
+  color: #ffffff;
 }
 
 .labelName {
   font-size: 20px;
-  font-weight: 600;
+  font-weight: 700;
+  color: #111413;
 }
 
 .labelSub {
   font-size: 13px;
-  color: #9ca3af;
+  color: #74817d;
 }
 
 .statsRow {
@@ -63,34 +68,36 @@
 
 .statLabel {
   font-size: 13px;
-  color: #9ca3af;
+  color: #74817d;
 }
 
 .statScore {
   font-size: 32px;
   font-weight: 700;
+  color: #111413;
 }
 
 .statScore span {
   font-size: 18px;
-  color: #9ca3af;
+  color: #74817d;
 }
 
 .statValue {
   font-size: 18px;
   font-weight: 600;
+  color: #111413;
 }
 
 .warn {
-  color: #facc15;
+  color: #9c7d42;
 }
 
 .ok {
-  color: #4ade80;
+  color: #4f8e72;
 }
 
 .muted {
-  color: #64748b;
+  color: #74817d;
 }
 
 .placeholderTag {
@@ -100,8 +107,8 @@
   font-size: 10px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #64748b;
-  border: 1px dashed #334155;
+  color: #74817d;
+  border: 1px dashed rgba(116, 188, 169, 0.4);
   border-radius: 4px;
   vertical-align: middle;
 }
@@ -114,27 +121,28 @@
 
 .metric {
   padding: 12px;
-  border-radius: 10px;
-  background: #0f172a;
-  border: 1px solid #111827;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(116, 188, 169, 0.16);
 }
 
 .metricLabel {
   font-size: 13px;
-  color: #9ca3af;
+  color: #74817d;
 }
 
 .metricValue {
   font-size: 16px;
   font-weight: 600;
+  color: #111413;
 }
 
 .cardTitle {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #cbd5e1;
+  color: #57625f;
 }
 
 .table {
@@ -147,12 +155,12 @@
 .table th,
 .table td {
   padding: 8px 4px;
-  border-bottom: 1px solid #111827;
+  border-bottom: 1px solid rgba(116, 188, 169, 0.14);
   text-align: left;
 }
 
 .table th {
-  color: #9ca3af;
+  color: #74817d;
   font-weight: 500;
 }
 
@@ -164,6 +172,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 0;
+  color: #57625f;
 }
 
 @media (max-width: 900px) {

@@ -63,7 +63,9 @@ function RegistrationHubContent() {
 
   useEffect(() => {
     if (!artistId) {
-      setError("Missing artistId query parameter. Try /verseiq/registration-hub?artistId=YOUR_ID");
+      setError(
+        "Sign in required — your artist ID will be loaded automatically after login. Real authentication is coming soon."
+      );
       setLoading(false);
       return;
     }

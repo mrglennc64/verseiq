@@ -539,13 +539,13 @@ export default function HomePage() {
           </span>
         </Link>
         <nav>
-          <a href="#features">Features</a>
+          <Link href="/login?next=/verseiq/registration-hub">Artist</Link>
+          <Link href="/login?next=/verseiq/label">Labels</Link>
+          <Link href="/login?next=/verseiq/manager">Managers</Link>
           <a href="#process">How It Works</a>
-          <a href="#audience">For Whom</a>
-          <Link href="/verseiq">Workflow</Link>
-          <a href="https://perfecthold.online" className="nav-cta" target="_blank" rel="noreferrer">
-            Perfect Hold
-          </a>
+          <Link href="/login" className="nav-cta">
+            Sign in
+          </Link>
         </nav>
       </header>
 
