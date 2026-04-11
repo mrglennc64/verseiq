@@ -1,17 +1,21 @@
 import { AgentMessage } from './types';
 
 export async function callLLM(messages: AgentMessage[]): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('Missing OPENAI_API_KEY');
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error('Missing OPENROUTER_API_KEY');
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const model = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
+
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://useverseiq.com',
+      'X-Title': 'VerseIQ Support',
     },
     body: JSON.stringify({
-      model: 'gpt-4o',
+      model,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
       max_tokens: 512,
       temperature: 0.2,
@@ -20,7 +24,7 @@ export async function callLLM(messages: AgentMessage[]): Promise<string> {
 
   if (!res.ok) {
     const error = await res.text();
-    throw new Error('OpenAI API error: ' + error);
+    throw new Error('OpenRouter API error: ' + error);
   }
 
   const data = await res.json();
