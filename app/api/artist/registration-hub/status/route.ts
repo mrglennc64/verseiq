@@ -19,6 +19,18 @@ export async function GET(req: NextRequest) {
 
   const registration = await getArtistRegistrationStatus(artistId);
 
+  // Catalog data for the hub dashboard — cheap enough to inline here rather
+  // than carving out a second endpoint. We cap the preview list at 10 rows.
+  const [recordingCount, recordings] = await Promise.all([
+    prisma.recording.count({ where: { artistId } }),
+    prisma.recording.findMany({
+      where: { artistId },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      select: { id: true, isrc: true, title: true, upc: true },
+    }),
+  ]);
+
   return NextResponse.json({
     artist: {
       id: artist.id,
@@ -31,5 +43,14 @@ export async function GET(req: NextRequest) {
     byOrg: registration.byOrg,
     overall: registration.overall,
     list: registration.list,
+    catalog: {
+      recordingCount,
+      preview: recordings.map((r) => ({
+        id: r.id,
+        title: r.title,
+        isrc: r.isrc,
+        missingUpc: !r.upc,
+      })),
+    },
   });
 }
