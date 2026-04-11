@@ -1,3 +1,4 @@
+import "./loadEnv";
 import { prisma } from "../lib/db";
 import type { RoyaltyTrack } from "../lib/royalty/types";
 import { getArtist, getArtistAlbums, getAlbumTracks } from "../lib/spotifyClient";
