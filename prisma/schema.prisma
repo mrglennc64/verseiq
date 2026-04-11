@@ -41,6 +41,11 @@ model TenantSettings {
 model Artist {
   id              String      @id @default(cuid())
   tenantId        String      @default("default")
+  // Owning user account. Nullable because legacy demo artists were seeded
+  // before auth existed. New artists created via the signup flow will always
+  // have this set.
+  userId          String?
+  user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   legalName       String
   stageName       String?
   address         String?
@@ -66,9 +71,70 @@ model Artist {
   soundexchangePackets SoundexchangePacket[]
 
   @@index([tenantId])
+  @@index([userId])
   @@index([spotifyArtistId])
   @@index([deezerArtistId])
   @@index([musicbrainzId])
+}
+
+// ---------------------------------------------------------------------------
+// NextAuth (Auth.js) models — standard shape required by @auth/prisma-adapter.
+// Do not add fields to these models inline; if extension is needed, create a
+// related 1:1 model (e.g. UserProfile) instead so the adapter stays happy.
+// ---------------------------------------------------------------------------
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  // Hashed password for the Credentials provider. Null when the user only
+  // uses OAuth providers (Google/Apple/etc., added later).
+  passwordHash  String?
+  role          String    @default("artist") // artist | manager | label | publisher | admin
+  createdAt     DateTime  @default(now())
+
+  accounts Account[]
+  sessions Session[]
+  artists  Artist[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 // Current registration state for an artist at a given organization.
