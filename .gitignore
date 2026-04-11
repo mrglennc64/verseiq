@@ -51,3 +51,4 @@ spotify_catalog_unresolved.csv
 soundexchange_export.csv
 tmp_soundexchange.csv
 tmp_spotify.csv
+tsconfig.tsbuildinfo
