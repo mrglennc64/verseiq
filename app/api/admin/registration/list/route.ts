@@ -7,6 +7,10 @@ import {
   type RegistrationStatusCode,
 } from "@/lib/registration/status";
 
+// Force dynamic — this route reads the live DB on every request.
+// Without this, Next 14 prerenders the handler at build time with empty results.
+export const dynamic = "force-dynamic";
+
 // GET /api/admin/registration/list
 //
 // Returns every artist with their current registration status for each org,
