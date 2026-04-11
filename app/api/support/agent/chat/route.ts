@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AgentChatRequest, AgentChatResponse } from '@/lib/verseiq-support/types';
+import { AgentChatRequest, AgentChatResponse, AgentMessage } from '@/lib/verseiq-support/types';
 import { getOrCreateSessionMessages, appendToSession } from '@/lib/verseiq-support/memory';
 import { SYSTEM_PROMPT } from '@/lib/verseiq-support/system-prompt';
 import { callLLM } from '@/lib/verseiq-support/llm';
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   const sessionId = body.sessionId || crypto.randomUUID();
   const history = getOrCreateSessionMessages(sessionId);
 
-  const messages = [
+  const messages: AgentMessage[] = [
     { role: 'system', content: SYSTEM_PROMPT },
     ...history,
     ...body.messages,
