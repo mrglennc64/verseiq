@@ -48,10 +48,63 @@ model Artist {
   soundexchangeId String?
   mlcId           String?
   proAffiliation  String?
+  // External catalog source IDs — nullable, non-unique (same artist may exist on multiple platforms).
+  // Used by the royalty-recovery scan pipeline and future Deezer/MusicBrainz catalog sources.
+  spotifyArtistId String?
+  deezerArtistId  String?
+  musicbrainzId   String?
   createdAt       DateTime    @default(now())
   recordings      Recording[]
+  registrationStatuses RegistrationStatus[]
+  reminderLogs         ReminderLog[]
 
   @@index([tenantId])
+  @@index([spotifyArtistId])
+  @@index([deezerArtistId])
+  @@index([musicbrainzId])
+}
+
+// Current registration state for an artist at a given organization.
+// One row per (artist, org). Updated in place by hooks or admin actions.
+// Status values (see lib/registration/status.ts for constants):
+//   NOT_STARTED, INTAKE_IN_PROGRESS, PACKET_GENERATED,
+//   ARTIST_ACTION_REQUIRED, SUBMITTED, VERIFIED, ACTIVE
+// Org values:
+//   SOUNDEXCHANGE, MLC, ASCAP, BMI, SOCAN, PRS, GMR
+model RegistrationStatus {
+  id        String   @id @default(cuid())
+  tenantId  String   @default("default")
+  artistId  String
+  artist    Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  org       String
+  status    String   @default("NOT_STARTED")
+  note      String?
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([artistId, org])
+  @@index([tenantId])
+  @@index([org])
+  @@index([status])
+}
+
+// Audit log of reminders sent from the admin dashboard. Email delivery is stubbed
+// for now — rows here track intent, not confirmed delivery.
+model ReminderLog {
+  id        String   @id @default(cuid())
+  tenantId  String   @default("default")
+  artistId  String
+  artist    Artist   @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  org       String
+  channel   String   @default("email") // "email" | "in-app" | "manual"
+  note      String?
+  sentBy    String?
+  sentAt    DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([artistId])
+  @@index([org])
 }
 
 model Recording {
